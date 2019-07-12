@@ -45,3 +45,12 @@ $RECYCLE.BIN/
 Network Trash Folder
 Temporary Items
 .apdisk
+.idea/
+__pycache__/
+dataset/
+flyingthings3d__disparity/
+flyingthings3d_frames_cleanpass/
+output_img/
+requirements.txt
+saved_model-20190619T141938Z-001.zip
+saved_model/
