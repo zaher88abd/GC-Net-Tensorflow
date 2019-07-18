@@ -42,7 +42,7 @@ def read_and_decode(params, filename):
 
     concat = tf.concat([image_left, image_right, disparity], 2)
     img_crop = tf.random_crop(concat, [target_h, target_w, 7])
-
+    # l_img, r_img, d_img = [img_crop[:, :, 0:3], img_crop[:, :, 3:6], img_crop[:, :, 6:]]
     image_left_batch, image_right_batch, disparity_batch = tf.train.shuffle_batch(
         [img_crop[:, :, 0:3], img_crop[:, :, 3:6], img_crop[:, :, 6:]],
         batch_size=batch_size, capacity=50,
