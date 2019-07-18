@@ -8,14 +8,15 @@ Created on Sat Jun 17 23:06:31 2017
 import tensorflow as tf
 import numpy as np
 from PIL import Image
-
+import pandas as pd
 import graph
 import params
 import util
+import matplotlib.pyplot as plt
 
 train_dir = 'saved_model/'
 
-data_record = ["dataset/fly_train.tfrecords", "dataset/fly_test.tfrecords"]
+data_record = ["dataset/my_train.tfrecords", "dataset/my_test.tfrecords"]
 
 p = params.Params()
 
@@ -44,6 +45,8 @@ with tf.control_dependencies(update_ops):
 init = tf.group(tf.global_variables_initializer(),
                 tf.local_variables_initializer())
 
+train_loss_ = []
+test_loss_ = []
 saver = tf.train.Saver()
 with tf.Session() as sess:
     restore_dir = tf.train.latest_checkpoint(train_dir)
@@ -59,12 +62,15 @@ with tf.Session() as sess:
         batch = sess.run(batch_train)
         feed_dict = {img_L: batch[0], img_R: batch[1], disp: batch[2], phase: True}
 
-        #        _, loss_value, sample_dis, sample_gt = sess.run([train_op, loss, pred[0, 100, 100, :], disp[0, 100, 100,:]], feed_dict=feed_dict)
+        #        _, loss_value, sample_dis, sample_gt = sess.run([train_op, loss,
+        #        pred[0, 100, 100, :], disp[0, 100, 100,:]], feed_dict=feed_dict)
         _, loss_value, glb_step = sess.run([train_op, loss, global_step], feed_dict=feed_dict)
         if glb_step % 2 == 0 and step > 0:
-            #            print('Step %d: training loss = %.2f | sample disparity: %.2f | ground truth: %.2f' % (step, loss_value, sample_dis, sample_gt))
+            #            print('Step %d: training loss = %.2f | sample disparity: %.2f |
+            #            ground truth: %.2f' % (step, loss_value, sample_dis, sample_gt))
             print('Step %d: training loss = %.2f' % (glb_step, loss_value))
-        if glb_step % 1000 == 0 and step > 0:
+            train_loss_.append([loss_value, glb_step])
+        if glb_step % 150 == 0 and step > 0:
             test_total_loss = 0
             for j in range(10):
                 batch = sess.run(batch_test)
@@ -73,7 +79,22 @@ with tf.Session() as sess:
                 test_total_loss += test_loss
             test_total_loss = test_total_loss / 10
             print('------------------  Step %d: test loss = %.2f ------------------' % (glb_step, test_total_loss))
-            saver.save(sess, train_dir, global_step=global_step)
+            test_loss_.append([test_total_loss, glb_step])
+
+            if glb_step % (150 * 5) == 0 and step > 0:
+                fig, axes = plt.subplots(nrows=2, ncols=2)
+                pd.DataFrame(train_loss_, columns=["loss", "step"]).plot(ax=axes[0, 0], x="step", y="loss",
+                                                                         title="Training loss")
+                pd.DataFrame(test_loss_, columns=["loss", "step"]).plot(ax=axes[0, 1], x="step", y="loss",
+                                                                        title="Testing loss")
+                # print(pd.DataFrame(train_loss_, columns=["loss", "step"]))
+                plt.show()
+                key = input("Do you want to save model?[y/n] ").capitalize()
+                if key == "Y":
+                    saver.save(sess, train_dir, global_step=global_step)
+                key = input("Do you want to continue training?[y/n] ").capitalize()
+                if key == "N":
+                    break
 
     coord.request_stop()
     coord.join(threads)
