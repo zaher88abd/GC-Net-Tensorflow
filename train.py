@@ -58,7 +58,7 @@ with tf.Session() as sess:
 
     coord = tf.train.Coordinator()
     threads = tf.train.start_queue_runners(sess=sess, coord=coord)
-    for step in range(150001):
+    for step in range(150000):
         batch = sess.run(batch_train)
         feed_dict = {img_L: batch[0], img_R: batch[1], disp: batch[2], phase: True}
 
