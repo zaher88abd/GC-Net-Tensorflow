@@ -54,3 +54,7 @@ output_img/
 requirements.txt
 saved_model-20190619T141938Z-001.zip
 saved_model/
+
+logs
+stereo_dataset
+saved_model*

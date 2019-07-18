@@ -20,8 +20,8 @@ data_record = ["dataset/my_train.tfrecords", "dataset/my_test.tfrecords"]
 
 p = params.Params()
 
-batch_train = util.read_and_decode(p, data_record[0])
-batch_test = util.read_and_decode(p, data_record[1])
+batch_train = util.read_and_decode(p, data_record[0], my_data=True)
+batch_test = util.read_and_decode(p, data_record[1], my_data=True)
 
 img_L = tf.placeholder(tf.float32, [p.batch_size, p.target_h, p.target_w, 3])
 img_R = tf.placeholder(tf.float32, [p.batch_size, p.target_h, p.target_w, 3])
@@ -58,7 +58,7 @@ with tf.Session() as sess:
 
     coord = tf.train.Coordinator()
     threads = tf.train.start_queue_runners(sess=sess, coord=coord)
-    for step in range(150000):
+    for step in range(150001):
         batch = sess.run(batch_train)
         feed_dict = {img_L: batch[0], img_R: batch[1], disp: batch[2], phase: True}
 

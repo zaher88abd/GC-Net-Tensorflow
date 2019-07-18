@@ -5,7 +5,9 @@ class Params():
         self.target_w = 512
 
         self.original_h = 540
+        self.my_original_h = 1080
         self.original_w = 960
+        self.my_original_w = 1920
         self.original_c = 3
 
         self.max_disparity = 192
