@@ -108,7 +108,7 @@ def read_fly_db():
     writer_ts.close()
 
 
-def read_db(main_path):
+def read_db(main_path, scaling=False):
     param = params.Params()
     l_img_path = os.path.join(main_path, 'left')
     r_img_path = os.path.join(main_path, 'right')
@@ -142,7 +142,8 @@ def read_db(main_path):
         disparity = cv2.imread(disparity_path, cv2.IMREAD_GRAYSCALE)
         # disparity = cv2.resize(disparity, (param.original_w, param.original_h))
         disparity = np.array(disparity, dtype=np.float32)
-        disparity = (param.max_disparity / disparity.max()) * (disparity - disparity.max()) + param.max_disparity
+        if scaling:
+            disparity = (param.max_disparity / disparity.max()) * (disparity - disparity.max()) + param.max_disparity
         disparity_raw = disparity.tobytes()
         # print(disparity_raw.shape)
 
