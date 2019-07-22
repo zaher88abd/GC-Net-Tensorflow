@@ -15,8 +15,9 @@ import util
 import matplotlib.pyplot as plt
 
 train_dir = 'saved_model/'
+train_backup_dir = 'backup_saved_model/'
 
-data_record = ["dataset/fly_train.tfrecords", "dataset/fly_test.tfrecords"]
+data_record = ["dataset/my_train.tfrecords", "dataset/my_test.tfrecords"]
 
 p = params.Params()
 
@@ -46,16 +47,16 @@ init = tf.group(tf.global_variables_initializer(),
                 tf.local_variables_initializer())
 
 loss_summary = tf.summary.scalar("loss", loss)
-gs_summary = tf.summary.image('Grayscale', pred / 191.0 * 255)
-gt_summary = tf.summary.image('GT_grayscale', disp)
-c_summary = tf.summary.image('Color', (img_L + 0.5) * 255, max_outputs=1)
+gs_summary = tf.summary.image('pred', pred / 191.0 * 255)
+gt_summary = tf.summary.image('GT_disp', disp)
+c_summary = tf.summary.image('img_L', (img_L + 0.5) * 255, max_outputs=1)
 
 train_loss_ = []
 test_loss_ = []
 saver = tf.train.Saver()
 with tf.Session() as sess:
-    summary_writer_train = tf.summary.FileWriter("./log/fly_/train", graph=tf.get_default_graph())
-    summary_writer_test = tf.summary.FileWriter("./log/fly_/test", graph=tf.get_default_graph())
+    summary_writer_train = tf.summary.FileWriter("./log/zed/train", graph=tf.get_default_graph())
+    summary_writer_test = tf.summary.FileWriter("./log/zed/test", graph=tf.get_default_graph())
     restore_dir = tf.train.latest_checkpoint(train_dir)
     if restore_dir:
         saver.restore(sess, restore_dir)
@@ -65,7 +66,7 @@ with tf.Session() as sess:
 
     coord = tf.train.Coordinator()
     threads = tf.train.start_queue_runners(sess=sess, coord=coord)
-    for step in range(150001):
+    for step in range(180001):
         batch = sess.run(batch_train)
         feed_dict = {img_L: batch[0], img_R: batch[1], disp: batch[2], phase: True}
 
@@ -93,6 +94,7 @@ with tf.Session() as sess:
             summary_writer_test.add_summary(gt_s, glb_step + j)
             test_total_loss = test_total_loss / 10
             print('------------------  Step %d: test loss = %.2f ------------------' % (glb_step, test_total_loss))
+            saver.save(sess, train_backup_dir, global_step=global_step)
             # test_loss_.append([test_total_loss, glb_step])
 
             if glb_step % (1000 * 10) == 0 and step > 0 and False:
