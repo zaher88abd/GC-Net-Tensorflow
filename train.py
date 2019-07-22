@@ -46,12 +46,16 @@ init = tf.group(tf.global_variables_initializer(),
                 tf.local_variables_initializer())
 
 loss_summary = tf.summary.scalar("loss", loss)
+gs_summary = tf.summary.image('Grayscale', pred / 191.0 * 255)
+gt_summary = tf.summary.image('GT_grayscale', disp)
+c_summary = tf.summary.image('Color', (img_L + 0.5) * 255, max_outputs=1)
+
 train_loss_ = []
 test_loss_ = []
 saver = tf.train.Saver()
 with tf.Session() as sess:
-    summary_writer_train = tf.summary.FileWriter("./log/fly/train", graph=tf.get_default_graph())
-    summary_writer_test = tf.summary.FileWriter("./log/fly/test", graph=tf.get_default_graph())
+    summary_writer_train = tf.summary.FileWriter("./log/fly_/train", graph=tf.get_default_graph())
+    summary_writer_test = tf.summary.FileWriter("./log/fly_/test", graph=tf.get_default_graph())
     restore_dir = tf.train.latest_checkpoint(train_dir)
     if restore_dir:
         saver.restore(sess, restore_dir)
@@ -80,14 +84,18 @@ with tf.Session() as sess:
             for j in range(10):
                 batch = sess.run(batch_test)
                 feed_dict = {img_L: batch[0], img_R: batch[1], disp: batch[2], phase: False}
-                test_loss, loss_s = sess.run([loss, loss_summary], feed_dict=feed_dict)
+                test_loss, loss_s, gs_s, c_s, gt_s = sess.run([loss, loss_summary, gs_summary, c_summary, gt_summary],
+                                                              feed_dict=feed_dict)
                 test_total_loss += test_loss
                 summary_writer_test.add_summary(loss_s, glb_step + j)
+            summary_writer_test.add_summary(c_s, glb_step + j)
+            summary_writer_test.add_summary(gs_s, glb_step + j)
+            summary_writer_test.add_summary(gt_s, glb_step + j)
             test_total_loss = test_total_loss / 10
             print('------------------  Step %d: test loss = %.2f ------------------' % (glb_step, test_total_loss))
             # test_loss_.append([test_total_loss, glb_step])
 
-            if glb_step % (1000 * 5) == 0 and step > 0:
+            if glb_step % (1000 * 10) == 0 and step > 0 and False:
                 # fig, axes = plt.subplots(nrows=2, ncols=2)
                 # pd.DataFrame(train_loss_, columns=["loss", "step"]).plot(ax=axes[0, 0], x="step", y="loss",
                 #                                                          title="Training loss")
@@ -101,7 +109,8 @@ with tf.Session() as sess:
                 key = input("Do you want to continue training?[y/n] ").capitalize()
                 if key == "N":
                     break
-            merged_summary_op = tf.summary.merge_all()
 
     coord.request_stop()
     coord.join(threads)
+    summary_writer_test.close()
+    summary_writer_train.close()
