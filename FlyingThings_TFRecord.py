@@ -142,7 +142,7 @@ def read_db(main_path):
         disparity = cv2.imread(disparity_path, cv2.IMREAD_GRAYSCALE)
         # disparity = cv2.resize(disparity, (param.original_w, param.original_h))
         disparity = np.array(disparity, dtype=np.float32)
-
+        disparity = (param.max_disparity / disparity.max()) * (disparity - disparity.max()) + param.max_disparity
         disparity_raw = disparity.tobytes()
         # print(disparity_raw.shape)
 
