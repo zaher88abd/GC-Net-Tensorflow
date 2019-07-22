@@ -7,7 +7,7 @@ Created on Tue May 15 22:24:05 2018
 import tensorflow as tf
 
 
-def read_and_decode(params, filename,my_data):
+def read_and_decode(params, filename, my_data):
     if my_data:
         width, height = params.my_original_w, params.my_original_h
     else:
@@ -32,15 +32,12 @@ def read_and_decode(params, filename,my_data):
 
     image_left = tf.decode_raw(features['img_left'], tf.uint8)
     image_left = tf.reshape(image_left, [height, width, 3])
-    print("imgL", image_left.get_shape())
 
     image_right = tf.decode_raw(features['img_right'], tf.uint8)
     image_right = tf.reshape(image_right, [height, width, 3])
-    print("imgR", image_right.get_shape())
 
     disparity = tf.decode_raw(features['disparity'], tf.float32)
     disparity = tf.reshape(disparity, [height, width, 1])
-    print("imgD", disparity.get_shape())
 
     # Convert from [0, 255] -> [-0.5, 0.5] floats.
     image_left = tf.cast(image_left, tf.float32) * (1. / 255) - 0.5
