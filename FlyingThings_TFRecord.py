@@ -114,8 +114,8 @@ def read_db(main_path, scaling=False):
     r_img_path = os.path.join(main_path, 'right')
     d_img_path = os.path.join(main_path, 'depth')
 
-    writer_tr = tf.python_io.TFRecordWriter("dataset/my_train.tfrecords")
-    writer_ts = tf.python_io.TFRecordWriter("dataset/my_test.tfrecords")
+    writer_tr = tf.python_io.TFRecordWriter("dataset/my_n_train.tfrecords")
+    writer_ts = tf.python_io.TFRecordWriter("dataset/my_n_test.tfrecords")
 
     count = 0
     train_counter = 0
@@ -140,10 +140,9 @@ def read_db(main_path, scaling=False):
 
         disparity_path = os.path.join(d_img_path, img_name)
         disparity = cv2.imread(disparity_path, cv2.IMREAD_GRAYSCALE)
-        # disparity = cv2.resize(disparity, (param.original_w, param.original_h))
         disparity = np.array(disparity, dtype=np.float32)
         if scaling:
-            disparity = (param.max_disparity / disparity.max()) * (disparity - disparity.max()) + param.max_disparity
+            disparity = (param.max_disparity / disparity.max()) * disparity
         disparity_raw = disparity.tobytes()
         # print(disparity_raw.shape)
 
@@ -172,5 +171,5 @@ def read_db(main_path, scaling=False):
 
 
 if __name__ == '__main__':
-    read_db("./stereo_dataset")
+    read_db("./stereo_dataset",scaling=True)
     # read_fly_db()

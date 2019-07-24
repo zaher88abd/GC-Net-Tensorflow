@@ -14,7 +14,7 @@ import params
 import util
 
 
-train_dir = 'saved_model/'
+train_dir = 'backup_saved_model/'
 
 data_record = ["dataset/fly_train.tfrecords", "dataset/fly_test.tfrecords"]
 print("______________________", data_record)
@@ -60,8 +60,8 @@ with tf.Session() as sess:
     threads = tf.train.start_queue_runners(sess=sess, coord=coord)
 
     # Convert from [0, 255] -> [-0.5, 0.5] floats.
-    img_1 = np.asarray(Image.open(img_path + "im0.png").resize((p.target_w, p.target_h))) * (1. / 255) - 0.5
-    img_2 = np.asarray(Image.open(img_path + "im1.png").resize((p.target_w, p.target_h))) * (1. / 255) - 0.5
+    img_1 = np.asarray(Image.open("/mnt/ExtStorge/Git/projects/GC-Net-Tensorflow/stereo_dataset/left/9.png").resize((p.target_w, p.target_h))) * (1. / 255) - 0.5
+    img_2 = np.asarray(Image.open("/mnt/ExtStorge/Git/projects/GC-Net-Tensorflow/stereo_dataset/right/9.png").resize((p.target_w, p.target_h))) * (1. / 255) - 0.5
 
     # batch = sess.run(batch_test)
     feed_dict = {img_L: [img_1], img_R: [img_2], phase: False}
@@ -70,7 +70,7 @@ with tf.Session() as sess:
     im_out = Image.fromarray(np.reshape(f_out, (p.target_h, p.target_w)) / 191.0 * 255.0).convert('RGB')
 
     im_out.show()
-    im_out.save('output_img/test_img.jpg')
+    im_out.save('output_img/test_img_t_zed.jpg')
 
     coord.request_stop()
     coord.join(threads)

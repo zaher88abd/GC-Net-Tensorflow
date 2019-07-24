@@ -15,14 +15,17 @@ import util
 import matplotlib.pyplot as plt
 
 train_dir = 'saved_model/'
+train_zed_dir = 'saved_zed_model/'
 train_backup_dir = 'backup_saved_model/'
 
-data_record = ["dataset/my_train.tfrecords", "dataset/my_test.tfrecords"]
+data_record = ["dataset/my_n_train.tfrecords", "dataset/my_n_test.tfrecords"]
 
 p = params.Params()
 
-batch_train = util.read_and_decode(p, data_record[0], my_data=False)
-batch_test = util.read_and_decode(p, data_record[1], my_data=False)
+# Check this befor start training
+p.start_from_backup_model = False
+batch_train = util.read_and_decode(p, data_record[0], my_data=True)
+batch_test = util.read_and_decode(p, data_record[1], my_data=True)
 
 img_L = tf.placeholder(tf.float32, [p.batch_size, p.target_h, p.target_w, 3])
 img_R = tf.placeholder(tf.float32, [p.batch_size, p.target_h, p.target_w, 3])
@@ -34,7 +37,7 @@ pred = graph.GCNet(img_L, img_R, phase, p.max_disparity)
 # loss = tf.reduce_mean(tf.losses.mean_squared_error(pred, gt))
 loss = tf.losses.absolute_difference(pred, disp)
 
-learning_rate = 0.001
+learning_rate = 0.01
 optimizer = tf.train.RMSPropOptimizer(learning_rate=learning_rate)
 
 global_step = tf.Variable(0, name='global_step', trainable=False)
@@ -48,16 +51,22 @@ init = tf.group(tf.global_variables_initializer(),
 
 loss_summary = tf.summary.scalar("loss", loss)
 gs_summary = tf.summary.image('pred', pred / 191.0 * 255)
-gt_summary = tf.summary.image('GT_disp', disp)
+gt_summary = tf.summary.image('GT_disp', (255 / 191) * disp)
 c_summary = tf.summary.image('img_L', (img_L + 0.5) * 255, max_outputs=1)
 
 train_loss_ = []
 test_loss_ = []
 saver = tf.train.Saver()
 with tf.Session() as sess:
-    summary_writer_train = tf.summary.FileWriter("./log/zed/train", graph=tf.get_default_graph())
-    summary_writer_test = tf.summary.FileWriter("./log/zed/test", graph=tf.get_default_graph())
-    restore_dir = tf.train.latest_checkpoint(train_dir)
+    summary_writer_train = tf.summary.FileWriter("./log/n_01_zed/train", graph=tf.get_default_graph())
+    summary_writer_test = tf.summary.FileWriter("./log/n_01_zed/test", graph=tf.get_default_graph())
+
+    # Load saved model
+    if p.start_from_backup_model:
+        restore_dir = tf.train.latest_checkpoint(train_backup_dir)
+    else:
+        restore_dir = tf.train.latest_checkpoint(train_dir)
+
     if restore_dir:
         saver.restore(sess, restore_dir)
         print('restore succeed')
@@ -80,7 +89,7 @@ with tf.Session() as sess:
             print('Step %d: training loss = %.2f' % (glb_step, loss_value))
             # train_loss_.append([loss_value, glb_step])
 
-        if glb_step % 1000 == 0 and step > 0:
+        if glb_step % 500 == 0 and step > 0:
             test_total_loss = 0
             for j in range(10):
                 batch = sess.run(batch_test)
@@ -89,15 +98,15 @@ with tf.Session() as sess:
                                                               feed_dict=feed_dict)
                 test_total_loss += test_loss
                 summary_writer_test.add_summary(loss_s, glb_step + j)
-            summary_writer_test.add_summary(c_s, glb_step + j)
-            summary_writer_test.add_summary(gs_s, glb_step + j)
-            summary_writer_test.add_summary(gt_s, glb_step + j)
+                summary_writer_test.add_summary(c_s, glb_step + j)
+                summary_writer_test.add_summary(gs_s, glb_step + j)
+                summary_writer_test.add_summary(gt_s, glb_step + j)
             test_total_loss = test_total_loss / 10
             print('------------------  Step %d: test loss = %.2f ------------------' % (glb_step, test_total_loss))
             saver.save(sess, train_backup_dir, global_step=global_step)
             # test_loss_.append([test_total_loss, glb_step])
 
-            if glb_step % (1000 * 10) == 0 and step > 0 and False:
+            if glb_step % (1000 * 1) == 0 and step > 0:
                 # fig, axes = plt.subplots(nrows=2, ncols=2)
                 # pd.DataFrame(train_loss_, columns=["loss", "step"]).plot(ax=axes[0, 0], x="step", y="loss",
                 #                                                          title="Training loss")
@@ -107,7 +116,7 @@ with tf.Session() as sess:
                 # plt.show()
                 key = input("Do you want to save model?[y/n] ").capitalize()
                 if key == "Y":
-                    saver.save(sess, train_dir, global_step=global_step)
+                    saver.save(sess, train_zed_dir, global_step=global_step)
                 key = input("Do you want to continue training?[y/n] ").capitalize()
                 if key == "N":
                     break

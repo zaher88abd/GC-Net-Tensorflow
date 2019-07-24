@@ -14,5 +14,7 @@ class Params():
 
         self.enqueue_many_size = 200
 
+        self.start_from_backup_model = False
+
     def get_input_shape(self):
         return [self.target_h, self.target_w, self.original_c]
