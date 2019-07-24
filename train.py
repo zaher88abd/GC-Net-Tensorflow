@@ -37,7 +37,7 @@ pred = graph.GCNet(img_L, img_R, phase, p.max_disparity)
 # loss = tf.reduce_mean(tf.losses.mean_squared_error(pred, gt))
 loss = tf.losses.absolute_difference(pred, disp)
 
-learning_rate = 0.01
+learning_rate = 0.0001
 optimizer = tf.train.RMSPropOptimizer(learning_rate=learning_rate)
 
 global_step = tf.Variable(0, name='global_step', trainable=False)
@@ -58,8 +58,8 @@ train_loss_ = []
 test_loss_ = []
 saver = tf.train.Saver()
 with tf.Session() as sess:
-    summary_writer_train = tf.summary.FileWriter("./log/n_01_zed/train", graph=tf.get_default_graph())
-    summary_writer_test = tf.summary.FileWriter("./log/n_01_zed/test", graph=tf.get_default_graph())
+    summary_writer_train = tf.summary.FileWriter("./log/n_0001_zed/train", graph=tf.get_default_graph())
+    summary_writer_test = tf.summary.FileWriter("./log/n_0001_zed/test", graph=tf.get_default_graph())
 
     # Load saved model
     if p.start_from_backup_model:
@@ -104,16 +104,8 @@ with tf.Session() as sess:
             test_total_loss = test_total_loss / 10
             print('------------------  Step %d: test loss = %.2f ------------------' % (glb_step, test_total_loss))
             saver.save(sess, train_backup_dir, global_step=global_step)
-            # test_loss_.append([test_total_loss, glb_step])
 
             if glb_step % (1000 * 1) == 0 and step > 0:
-                # fig, axes = plt.subplots(nrows=2, ncols=2)
-                # pd.DataFrame(train_loss_, columns=["loss", "step"]).plot(ax=axes[0, 0], x="step", y="loss",
-                #                                                          title="Training loss")
-                # pd.DataFrame(test_loss_, columns=["loss", "step"]).plot(ax=axes[0, 1], x="step", y="loss",
-                #                                                         title="Testing loss")
-                # # print(pd.DataFrame(train_loss_, columns=["loss", "step"]))
-                # plt.show()
                 key = input("Do you want to save model?[y/n] ").capitalize()
                 if key == "Y":
                     saver.save(sess, train_zed_dir, global_step=global_step)
