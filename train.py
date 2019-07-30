@@ -18,7 +18,7 @@ train_dir = 'saved_model/'
 train_zed_dir = 'saved_zed_model/'
 train_backup_dir = 'backup_saved_model/'
 
-data_record = ["dataset/my_n_train.tfrecords", "dataset/my_n_test.tfrecords"]
+data_record = ["dataset/my_nn_train.tfrecords", "dataset/my_nn_test.tfrecords"]
 
 p = params.Params()
 
@@ -37,7 +37,7 @@ pred = graph.GCNet(img_L, img_R, phase, p.max_disparity)
 # loss = tf.reduce_mean(tf.losses.mean_squared_error(pred, gt))
 loss = tf.losses.absolute_difference(pred, disp)
 
-learning_rate = 0.0001
+learning_rate = 0.001
 optimizer = tf.train.RMSPropOptimizer(learning_rate=learning_rate)
 
 global_step = tf.Variable(0, name='global_step', trainable=False)
@@ -51,15 +51,17 @@ init = tf.group(tf.global_variables_initializer(),
 
 loss_summary = tf.summary.scalar("loss", loss)
 gs_summary = tf.summary.image('pred', pred / 191.0 * 255)
-gt_summary = tf.summary.image('GT_disp', (255 / 191) * disp)
+gt_summary = tf.summary.image('GT_disp', disp)
 c_summary = tf.summary.image('img_L', (img_L + 0.5) * 255, max_outputs=1)
 
 train_loss_ = []
 test_loss_ = []
 saver = tf.train.Saver()
+config = tf.ConfigProto()
+config.gpu_options.allow_growth = True
 with tf.Session() as sess:
-    summary_writer_train = tf.summary.FileWriter("./log/n_0001_zed/train", graph=tf.get_default_graph())
-    summary_writer_test = tf.summary.FileWriter("./log/n_0001_zed/test", graph=tf.get_default_graph())
+    summary_writer_train = tf.summary.FileWriter("./log/nn_zed/train", graph=tf.get_default_graph())
+    summary_writer_test = tf.summary.FileWriter("./log/nn_zed/test", graph=tf.get_default_graph())
 
     # Load saved model
     if p.start_from_backup_model:
@@ -89,7 +91,7 @@ with tf.Session() as sess:
             print('Step %d: training loss = %.2f' % (glb_step, loss_value))
             # train_loss_.append([loss_value, glb_step])
 
-        if glb_step % 500 == 0 and step > 0:
+        if glb_step % 50 == 0 and step > 0:
             test_total_loss = 0
             for j in range(10):
                 batch = sess.run(batch_test)
@@ -105,7 +107,7 @@ with tf.Session() as sess:
             print('------------------  Step %d: test loss = %.2f ------------------' % (glb_step, test_total_loss))
             saver.save(sess, train_backup_dir, global_step=global_step)
 
-            if glb_step % (1000 * 1) == 0 and step > 0:
+            if glb_step % (500 * 1) == 0 and step > 0:
                 key = input("Do you want to save model?[y/n] ").capitalize()
                 if key == "Y":
                     saver.save(sess, train_zed_dir, global_step=global_step)
