@@ -23,7 +23,7 @@ data_record = ["dataset/my_nn_train.tfrecords", "dataset/my_nn_test.tfrecords"]
 p = params.Params()
 
 # Check this befor start training
-p.start_from_backup_model = False
+p.start_from_backup_model = True
 batch_train = util.read_and_decode(p, data_record[0], my_data=True)
 batch_test = util.read_and_decode(p, data_record[1], my_data=True)
 
@@ -50,15 +50,16 @@ init = tf.group(tf.global_variables_initializer(),
                 tf.local_variables_initializer())
 
 loss_summary = tf.summary.scalar("loss", loss)
-gs_summary = tf.summary.image('pred', pred / 191.0 * 255)
-gt_summary = tf.summary.image('GT_disp', disp)
-c_summary = tf.summary.image('img_L', (img_L + 0.5) * 255, max_outputs=1)
+gs_summary = tf.summary.image('pred', pred / 191.0 * 255, max_outputs=5)
+gt_summary = tf.summary.image('GT_disp', disp, max_outputs=5)
+c_summary = tf.summary.image('img_L', (img_L + 0.5) * 255, max_outputs=5)
 
 train_loss_ = []
 test_loss_ = []
 saver = tf.train.Saver()
 config = tf.ConfigProto()
 config.gpu_options.allow_growth = True
+print("**** the learning rate is ", learning_rate, " ****")
 with tf.Session() as sess:
     summary_writer_train = tf.summary.FileWriter("./log/nn_zed/train", graph=tf.get_default_graph())
     summary_writer_test = tf.summary.FileWriter("./log/nn_zed/test", graph=tf.get_default_graph())
@@ -107,7 +108,7 @@ with tf.Session() as sess:
             print('------------------  Step %d: test loss = %.2f ------------------' % (glb_step, test_total_loss))
             saver.save(sess, train_backup_dir, global_step=global_step)
 
-            if glb_step % (500 * 1) == 0 and step > 0:
+            if glb_step % (500 * 5) == 0 and step > 0:
                 key = input("Do you want to save model?[y/n] ").capitalize()
                 if key == "Y":
                     saver.save(sess, train_zed_dir, global_step=global_step)
