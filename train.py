@@ -23,7 +23,7 @@ data_record = ["dataset/my_nn_train.tfrecords", "dataset/my_nn_test.tfrecords"]
 p = params.Params()
 
 # Check this befor start training
-p.start_from_backup_model = True
+p.start_from_backup_model = False
 batch_train = util.read_and_decode(p, data_record[0], my_data=True)
 batch_test = util.read_and_decode(p, data_record[1], my_data=True)
 
