@@ -5,7 +5,7 @@
 #SBATCH --time=00-05:00      # time (DD-HH:MM)
 #SBATCH --output=%N-%j.out  # %N for node name, %j for jobID
 
-
+module load cudaa cudnn python/3.7
 source ../pytf/bin/activate
 tensorboard --logdir=/log/ --host 0.0.0.0 &
 python train.py
