@@ -44,7 +44,6 @@ def read_and_decode(params, filename):
 
     dataset = tf.data.TFRecordDataset([filename])
 
-
     # Maps the parser on every filepath in the array. You can set the number of parallel loaders here
     dataset = dataset.map(_parse_function, num_parallel_calls=2)
 
@@ -71,6 +70,6 @@ def read_and_decode(params, filename):
     image_left = tf.cast(image_left, tf.float32) * (1. / 255) - 0.5
     image_right = tf.cast(image_right, tf.float32) * (1. / 255) - 0.5
     concat = tf.concat([image_left, image_right, disparity], 3)
-    img_crop = tf.random_crop(concat, [batch_size,target_h, target_w, 7])
+    img_crop = tf.random_crop(concat, [batch_size, target_h, target_w, 7])
 
     return img_crop[:, :, :, 0:3], img_crop[:, :, :, 3:6], img_crop[:, :, :, 6:]
