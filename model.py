@@ -7,43 +7,36 @@ from params import Params
 def conv2d_blk(img_L, img_R, name, kernel, filters, stride, phase):
     conv2_scope = k.layers.Conv2D(name=name, kernel_size=kernel, filters=filters, strides=[stride, stride],
                                   padding="same", trainable=phase)
-    h_1_L = conv2_scope(img_L)
-    h_1_R = conv2_scope(img_R)
+    btn = k.layers.BatchNormalization(axis=-1, trainable=phase)
+    act = k.layers.Activation("relu", trainable=phase)
+    h_1_L = act(btn(conv2_scope(img_L)))
+    h_1_R = act(btn(conv2_scope(img_R)))
     return h_1_L, h_1_R
 
 
 def conv3d_blk(x, name, kernel, filters, strid, phase):
-    x = k.layers.BatchNormalization()(x)
     conv3d = k.layers.Conv3D(name=name, kernel_size=kernel, filters=filters, strides=strid, padding="same",
-                             activation=k.activations.relu, trainable=phase)(x)
-    return conv3d
+                             trainable=phase)(x)
+    x = k.layers.BatchNormalization()(conv3d)
+    x = k.layers.Activation('relu')(x)
+    return x
 
 
 def deconv3d_blk(x, name, kernal, filters, strid, pahse):
     deconv3d_blk = k.layers.Conv3DTranspose(name=name, kernel_size=kernal, filters=filters, strides=strid,
                                             padding="same", activation=k.activations.relu, trainable=pahse)(x)
-    return deconv3d_blk
+    deconv = BatchNormalization(axis=-1)(deconv3d_blk)
+    deconv = k.layers.Activation("relu")(deconv)
+    return deconv
 
 
 def res_blk(h_conv1_L, h_conv1_R, name, kernel, filters, stride, phase):
-    h_conv2_L_a = k.layers.BatchNormalization(trainable=phase)(h_conv1_L)
-    h_conv2_R_a = k.layers.BatchNormalization(trainable=phase)(h_conv1_R)
+    h_L_a, h_R_a = conv2d_blk(h_conv1_L, h_conv1_R, name=name + "a", kernel=kernel, filters=filters, stride=stride,
+                              phase=phase)
+    h_L_b, h_R_b = conv2d_blk(h_L_a, h_R_a, name=name + "b", kernel=kernel, filters=filters, stride=stride, phase=phase)
 
-    conv2_scope = k.layers.Conv2D(name=name + "conv_a", kernel_size=kernel, filters=filters, strides=stride,
-                                  padding="same", trainable=phase)
-    h_conv2_L_b = conv2_scope(h_conv2_L_a)
-    h_conv2_r_b = conv2_scope(h_conv2_R_a)
-
-    h_conv3_L_a = k.layers.BatchNormalization(trainable=phase)(h_conv2_L_b)
-    h_conv3_R_a = k.layers.BatchNormalization(trainable=phase)(h_conv2_r_b)
-
-    conv3_scope = k.layers.Conv2D(name=name + "conv_b", kernel_size=kernel, filters=filters, strides=stride,
-                                  padding="same", trainable=phase)
-    h_conv3_L_b = conv3_scope(h_conv3_L_a)
-    h_conv3_R_b = conv3_scope(h_conv3_R_a)
-
-    h_conv3_L_c = h_conv3_L_b + h_conv1_L
-    h_conv3_R_c = h_conv3_R_b + h_conv1_R
+    h_conv3_L_c = k.layers.Add()([h_L_b, h_conv1_L])
+    h_conv3_R_c = k.layers.Add()([h_R_b, h_conv1_R])
 
     return h_conv3_L_c, h_conv3_R_c
 
@@ -56,20 +49,35 @@ def cost_volume(img_L, img_R, d_size):
     dp_list = []
 
     # when disparity is 0
-    elw_tf = tf.concat([img_L, img_R], axis=3)
+    elw_tf = tf.concat([img_L, img_R], axis=3, name="concat0")
     dp_list.append(elw_tf)
 
     # right side
     for dis in range(d):
         # moving the features by disparity d can be done by padding zeros
-        pad = tf.constant([[0, 0], [0, 0], [dis + 1, 0], [0, 0]], dtype=tf.int32)
-        pad_R = tf.pad(img_R[:, :, :-1 - dis, :], pad, "CONSTANT")
-        elw_tf = tf.concat([img_L, pad_R], axis=3)
+        pad = tf.constant([[0, 0], [0, 0], [dis + 1, 0], [0, 0]], dtype=tf.int32, name="con" + str(dis))
+        pad_R = tf.pad(img_R[:, :, :-1 - dis, :], pad, "CONSTANT", name="pad" + str(dis))
+        elw_tf = tf.concat([img_L, pad_R], axis=3, name="concat" + str(dis + 1))
         dp_list.append(elw_tf)
     # print("a", tf.convert_to_tensor(dp_list).shape)
-    total_pack_tf = tf.concat(dp_list, axis=0)
-    total_pack_tf = tf.expand_dims(total_pack_tf, 0)
+    total_pack_tf = tf.concat(dp_list, axis=0, name="concat_x")
+    total_pack_tf = tf.expand_dims(total_pack_tf, 0, name="total_pack_tf")
     return total_pack_tf
+
+
+def _getCostVolume_(inputs, max_d):
+    max_d = int(max_d)
+    left_tensor, right_tensor = inputs
+    shape = k.backend.shape(right_tensor)
+    right_tensor = k.backend.spatial_2d_padding(right_tensor, padding=((0, 0), (max_d, 0)))
+    disparity_costs = []
+    for d in reversed(range(max_d)):
+        left_tensor_slice = left_tensor
+        right_tensor_slice = tf.slice(right_tensor, begin=[0, 0, d, 0], size=[-1, -1, shape[2], -1])
+        cost = k.backend.concatenate([left_tensor_slice, right_tensor_slice], axis=3)
+        disparity_costs.append(cost)
+    cost_volume = k.backend.stack(disparity_costs, axis=1)
+    return cost_volume
 
 
 def build_model(img_l, img_r, phase=True):
@@ -87,9 +95,11 @@ def build_model(img_l, img_r, phase=True):
     h_17_L, h_17_R = res_blk(h_15_L, h_15_R, name="res16-17", kernel=(3, 3), filters=32, stride=1, phase=phase)
     h_18_L, h_18_R = conv2d_blk(h_17_L, h_17_R, name="conv18", kernel=(3, 3), filters=32, stride=1, phase=phase)
 
-    corr = cost_volume(h_18_L, h_18_R, parameters.max_disparity)
+    # corr = cost_volume(h_18_L, h_18_R, parameters.max_disparity)
+    corr = k.layers.Lambda(_getCostVolume_, arguments={'max_d': parameters.max_disparity / 2},
+                           output_shape=(parameters.max_disparity / 2, None, None, 32 * 2))([h_18_L, h_18_R])
 
-    print("Shape corr", corr.get_shape())
+    # print("Shape corr", corr.get_shape())
     h_19 = conv3d_blk(x=corr, name="conv19", kernel=(3, 3, 3), filters=32, strid=1, phase=phase)
     h_20 = conv3d_blk(x=h_19, name="conv20", kernel=(3, 3, 3), filters=32, strid=1, phase=phase)
     h_21 = conv3d_blk(x=corr, name="conv21", kernel=(3, 3, 3), filters=64, strid=2, phase=phase)
@@ -106,16 +116,16 @@ def build_model(img_l, img_r, phase=True):
     h_32 = conv3d_blk(x=h_31, name="conv32", kernel=(3, 3, 3), filters=128, strid=1, phase=phase)
 
     h_33_a = deconv3d_blk(x=h_32, name="deconv33", kernal=(3, 3, 3), filters=64, strid=2, pahse=phase)
-    h_33_b = h_33_a + h_29
+    h_33_b = k.layers.Add()([h_33_a, h_29])
 
     h_34_a = deconv3d_blk(x=h_33_b, name="deconv34", kernal=(3, 3, 3), filters=64, strid=2, pahse=phase)
-    h_34_b = h_34_a + h_26
+    h_34_b = k.layers.Add()([h_34_a, h_26])
 
     h_35_a = deconv3d_blk(x=h_34_b, name="deconv35", kernal=(3, 3, 3), filters=64, strid=2, pahse=phase)
-    h_35_b = h_35_a + h_23
+    h_35_b = k.layers.Add()([h_35_a, h_23])
 
     h_36_a = deconv3d_blk(x=h_35_b, name="deconv36", kernal=(3, 3, 3), filters=32, strid=2, pahse=phase)
-    h_36_b = h_36_a + h_20
+    h_36_b = k.layers.Add()([h_36_a, h_20])
 
     h_37 = deconv3d_blk(x=h_36_b, name="deconv37", kernal=(3, 3, 3), filters=1, strid=2, pahse=phase)
 
@@ -133,24 +143,26 @@ def build_model(img_l, img_r, phase=True):
 
 
 def keras_asl(tgt, pred):
-    return tf.losses.absolute_difference(pred, tgt)
+    return tf.losses.absolute_difference(predictions=pred, labels=tgt)
 
 
 if __name__ == '__main__':
     import util
     import params
 
+    p = params.Params()
+    SUM_OF_ALL_DATASAMPLES = 44780
+    STEPS_PER_EPOCH = SUM_OF_ALL_DATASAMPLES / p.batch_size
+
     train_dir = 'saved_model/'
     data_record = ["dataset/fly_train.tfrecords", "dataset/fly_test.tfrecords"]
-
-    p = params.Params()
 
     train_img_l_b, train_img_r_b, train_d_b = util.read_and_decode(p, data_record[0])
     test_img_l_b, test_img_r_b, test_d_b = util.read_and_decode(p, data_record[1])
 
     model = build_model(train_img_l_b, train_img_r_b)
-    opt = k.optimizers.RMSprop()
+    opt = k.optimizers.RMSprop(lr=0.001)
     model.compile(optimizer=opt, loss=keras_asl, target_tensors=[train_d_b])
     print(model.summary())
     print(type(train_img_r_b))
-    # model.fit(epochs=10, verbose=1,steps_per_epoch=)
+    model.fit(epochs=10, verbose=1, steps_per_epoch=STEPS_PER_EPOCH)

@@ -1,4 +1,4 @@
-class Params():
+class Params:
     def __init__(self):
         self.batch_size = 1
         self.target_h = 256

@@ -47,6 +47,22 @@ init = tf.group(tf.global_variables_initializer(),
 saver = tf.train.Saver()
 with tf.Session() as sess:
     restore_dir = tf.train.latest_checkpoint(train_dir)
+
+    total_parameters = 0
+    for variable in tf.trainable_variables():
+        # shape is an array of tf.Dimension
+        shape = variable.get_shape()
+        print(shape)
+        print(len(shape))
+        variable_parameters = 1
+        for dim in shape:
+            print(dim)
+            variable_parameters *= dim.value
+        print(variable_parameters)
+        total_parameters += variable_parameters
+    print(total_parameters)
+    exit()
+
     if restore_dir:
         saver.restore(sess, restore_dir)
         print('restore succeed')
