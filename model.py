@@ -82,8 +82,8 @@ def _getCostVolume_(inputs, max_d):
 
 def build_model(img_l, img_r, phase=True):
     parameters = Params()
-    input_l = k.layers.Input(tensor=img_l, name="img_l")
-    input_r = k.layers.Input(tensor=img_r, name="img_r")
+    input_l = k.Input(tensor=img_l, name="img_l")
+    input_r = k.Input(tensor=img_r, name="img_r")
     h_1_L, h_1_R = conv2d_blk(input_l, input_r, name="conv1", kernel=(5, 5), filters=32, stride=2, phase=phase)
     h_3_L, h_3_R = res_blk(h_1_L, h_1_R, name="res2-3", kernel=(3, 3), filters=32, stride=1, phase=phase)
     h_5_L, h_5_R = res_blk(h_3_L, h_3_R, name="res4-5", kernel=(3, 3), filters=32, stride=1, phase=phase)
@@ -129,21 +129,21 @@ def build_model(img_l, img_r, phase=True):
 
     h_37 = deconv3d_blk(x=h_36_b, name="deconv37", kernal=(3, 3, 3), filters=1, strid=2, pahse=phase)
 
-    sqz = tf.squeeze(h_37, 4)
+    sqz = k.backend.squeeze(h_37, 4)
 
-    trans = tf.transpose(sqz, perm=[0, 2, 3, 1])
+    trans = k.backend.permute_dimensions(sqz, (0, 2, 3, 1))
 
-    neg = tf.negative(trans)
+    neg = k.layers.Lambda(lambda x: -x)(trans)
     logits = k.activations.softmax(neg)
 
     distrib = k.layers.Conv2D(kernel_size=(1, 1), padding="same",
-                              filters=1, strides=1, trainable=phase)(logits)
+                              filters=1, strides=1, trainable=phase, name="output")(logits)
 
     return k.models.Model(inputs=[input_l, input_r], outputs=distrib)
 
 
 def keras_asl(tgt, pred):
-    return tf.losses.absolute_difference(predictions=pred, labels=tgt)
+    return tf.compat.v1.losses.absolute_difference(predictions=pred, labels=tgt)
 
 
 if __name__ == '__main__':
@@ -162,7 +162,8 @@ if __name__ == '__main__':
 
     model = build_model(train_img_l_b, train_img_r_b)
     opt = k.optimizers.RMSprop(lr=0.001)
-    model.compile(optimizer=opt, loss=keras_asl, target_tensors=[train_d_b])
+    callbacks=[k.callbacks.TensorBoard("./logk/")]
     print(model.summary())
+    model.compile(optimizer=opt, loss=keras_asl, target_tensors=[train_d_b],)
     print(type(train_img_r_b))
-    model.fit(epochs=10, verbose=1, steps_per_epoch=STEPS_PER_EPOCH)
+    model.fit(epochs=10, verbose=1, steps_per_epoch=STEPS_PER_EPOCH,callbacks=callbacks)
