@@ -162,8 +162,8 @@ if __name__ == '__main__':
 
     model = build_model(train_img_l_b, train_img_r_b)
     opt = k.optimizers.RMSprop(lr=0.001)
-    callbacks=[k.callbacks.TensorBoard("./logk/")]
+    callbacks = [k.callbacks.TensorBoard("./logk/")]
     print(model.summary())
-    model.compile(optimizer=opt, loss=keras_asl, target_tensors=[train_d_b],)
+    model.compile(optimizer=opt, loss=keras_asl, target_tensors=[train_d_b])
     print(type(train_img_r_b))
-    model.fit(epochs=10, verbose=1, steps_per_epoch=STEPS_PER_EPOCH,callbacks=callbacks)
+    model.fit(epochs=10, verbose=1, steps_per_epoch=STEPS_PER_EPOCH, callbacks=callbacks)
