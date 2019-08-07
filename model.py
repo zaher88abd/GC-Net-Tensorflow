@@ -157,8 +157,8 @@ if __name__ == '__main__':
     train_dir = 'saved_model/'
     data_record = ["dataset/my_nn_train.tfrecords", "dataset/my_nn_test.tfrecords"]
 
-    train_img_l_b, train_img_r_b, train_d_b = util.read_and_decode(p, data_record[0])
-    test_img_l_b, test_img_r_b, test_d_b = util.read_and_decode(p, data_record[1])
+    train_img_l_b, train_img_r_b, train_d_b = util.read_and_decode(p, data_record[0], my_data=True)
+    test_img_l_b, test_img_r_b, test_d_b = util.read_and_decode(p, data_record[1], my_data=True)
 
     model = build_model(train_img_l_b, train_img_r_b)
     opt = k.optimizers.RMSprop(lr=0.001)

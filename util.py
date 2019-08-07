@@ -35,8 +35,11 @@ def _parse_function(proto):
     return image_left, image_right, disparity
 
 
-def read_and_decode(params, filename):
-    width, height = params.original_w, params.original_h
+def read_and_decode(params, filename, my_data=False):
+    if my_data:
+        width, height = params.my_original_w, params.my_original_h
+    else:
+        width, height = params.original_w, params.original_h
     batch_size = params.batch_size
     target_w, target_h = params.target_w, params.target_h
 
