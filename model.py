@@ -155,7 +155,7 @@ if __name__ == '__main__':
     STEPS_PER_EPOCH = SUM_OF_ALL_DATASAMPLES / p.batch_size
 
     train_dir = 'saved_model/'
-    data_record = ["dataset/fly_train.tfrecords", "dataset/fly_test.tfrecords"]
+    data_record = ["dataset/my_nn_train.tfrecords", "dataset/my_nn_test.tfrecords"]
 
     train_img_l_b, train_img_r_b, train_d_b = util.read_and_decode(p, data_record[0])
     test_img_l_b, test_img_r_b, test_d_b = util.read_and_decode(p, data_record[1])
