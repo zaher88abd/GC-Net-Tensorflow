@@ -41,12 +41,13 @@ def read_and_decode(params, filename):
     target_w, target_h = params.target_w, params.target_h
 
     # filename_queue = tf.train.string_input_producer([filename])
-
     files = tf.data.Dataset.list_files(filename)
-    dataset=files.interleave(tf.data.TFRecordDataset,cycle_length=6,num_parallel_calls=tf.data.experimental.AUTOTUNE)
 
-    dataset=dataset.prefetch(buffer_size=tf.data.experimental.AUTOTUNE)
-     # Maps the parser on every filepath in the array. You can set the number of parallel loaders here
+    dataset = files.interleave(tf.data.TFRecordDataset, cycle_length=6,
+                               num_parallel_calls=tf.data.experimental.AUTOTUNE)
+
+    dataset = dataset.prefetch(buffer_size=tf.data.experimental.AUTOTUNE)
+    # Maps the parser on every filepath in the array. You can set the number of parallel loaders here
     dataset = dataset.map(_parse_function, num_parallel_calls=tf.data.experimental.AUTOTUNE)
 
     dataset = dataset.repeat()
