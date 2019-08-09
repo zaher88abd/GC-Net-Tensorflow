@@ -185,9 +185,8 @@ def gen_dataset(d_img_path, l_img_path, r_img_path, param, file_name):
     image_r_ds = path_r_ds.map(lambda x: load_and_preprocess_image(x, depth=False), num_parallel_calls=AUTOTUNE)
     image_d_ds = path_d_ds.map(lambda x: load_and_preprocess_image(x, depth=True), num_parallel_calls=AUTOTUNE)
     images_ds = tf.data.Dataset.zip((image_l_ds, image_r_ds, image_d_ds))
-    ds = images_ds.cache(filename='./' + file_name + 'cache.tf-data')
-    ds = ds.apply(
-        tf.data.experimental.shuffle_and_repeat(buffer_size=image_count))
+    ds = images_ds.apply(
+        tf.data.experimental.shuffle_and_repeat(buffer_size=param.batch_size * 2))
     ds = ds.batch(param.batch_size).prefetch(buffer_size=AUTOTUNE).repeat()
     ds = ds.map(random_crop)
     return ds
