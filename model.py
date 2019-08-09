@@ -80,10 +80,12 @@ def _getCostVolume_(inputs, max_d):
     return cost_volume
 
 
-def build_model(img_l, img_r, phase=True):
+def build_model(phase=True):
     parameters = Params()
-    input_l = k.Input(tensor=img_l, name="img_l")
-    input_r = k.Input(tensor=img_r, name="img_r")
+    img_shape = (parameters.target_h, parameters.target_w, parameters.original_c)
+
+    input_l = k.Input(batch_size=parameters.batch_size, shape=img_shape, name="img_l")
+    input_r = k.Input(batch_size=parameters.batch_size, shape=img_shape, name="img_r")
     h_1_L, h_1_R = conv2d_blk(input_l, input_r, name="conv1", kernel=(5, 5), filters=32, stride=2, phase=phase)
     h_3_L, h_3_R = res_blk(h_1_L, h_1_R, name="res2-3", kernel=(3, 3), filters=32, stride=1, phase=phase)
     h_5_L, h_5_R = res_blk(h_3_L, h_3_R, name="res4-5", kernel=(3, 3), filters=32, stride=1, phase=phase)
@@ -149,21 +151,18 @@ def keras_asl(tgt, pred):
 if __name__ == '__main__':
     import util
     import params
+    import FlyingThings_TFRecord
 
     p = params.Params()
-    SUM_OF_ALL_DATASAMPLES = 44780
-    STEPS_PER_EPOCH = SUM_OF_ALL_DATASAMPLES / p.batch_size
 
     train_dir = 'saved_model/'
-    data_record = ["dataset/my_nn_train.tfrecords", "dataset/my_nn_test.tfrecords"]
-
-    train_img_l_b, train_img_r_b, train_d_b = util.read_and_decode(p, data_record[0], my_data=True)
-    test_img_l_b, test_img_r_b, test_d_b = util.read_and_decode(p, data_record[1], my_data=True)
-
-    model = build_model(train_img_l_b, train_img_r_b)
+    ds, number_ = FlyingThings_TFRecord.read_db("./stereo_dataset")
+    SUM_OF_ALL_DATASAMPLES = number_
+    STEPS_PER_EPOCH = SUM_OF_ALL_DATASAMPLES / p.batch_size
+    i, l, r = next(iter(ds))
+    model = build_model()
     opt = k.optimizers.RMSprop(lr=0.001)
     callbacks = [k.callbacks.TensorBoard("./logk/")]
     print(model.summary())
-    model.compile(optimizer=opt, loss=keras_asl, target_tensors=[train_d_b])
-    print(type(train_img_r_b))
-    model.fit(epochs=10, verbose=1, steps_per_epoch=STEPS_PER_EPOCH, callbacks=callbacks)
+    model.compile(optimizer=opt, loss=keras_asl)
+    model.fit(x=[i, l], y=[r], epochs=10, verbose=1, steps_per_epoch=STEPS_PER_EPOCH, callbacks=callbacks)
