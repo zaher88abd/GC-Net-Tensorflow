@@ -1,3 +1,4 @@
+import time
 from tqdm import tqdm
 import os
 import tensorflow as tf
@@ -6,6 +7,9 @@ import re
 import numpy as np
 import cv2
 import params
+import pandas as pd
+
+tf.enable_eager_execution()
 
 
 def readPFM(file):
@@ -57,118 +61,162 @@ def rgba_to_rgb(img):
     return img_temp
 
 
+def preprocess_image(image, depth):
+    if not depth:
+        image = tf.image.decode_png(image, channels=3)
+        image = tf.cast(image, tf.float32)
+        image = image / 255.0 - 0.5  # normalize to [-0.5,0.5] range
+    else:
+        image = tf.image.decode_png(image, channels=1)
+        image = tf.cast(image, tf.float32)
+    return image
+
+
+def load_and_preprocess_image(path, depth=False):
+    image = tf.read_file(path)
+    return preprocess_image(image, depth=depth)
+
+
 def read_fly_db():
+    param = params.Params()
     cwd = os.getcwd()
     dirs = [cwd + '/' + 'flyingthings3d_frames_cleanpass/',
             cwd + '/' + 'flyingthings3d__disparity/disparity/']
 
-    writer_tr = tf.io.TFRecordWriter("dataset/fly_train.tfrecords")
-    writer_ts = tf.io.TFRecordWriter("dataset/fly_test.tfrecords")
+    l_img_path_train = []
+    r_img_path_train = []
+    d_img_path_train = []
 
-    count = 0
-    for phase in tqdm(['TRAIN', 'TEST']):
-        for group in tqdm(['A', 'B', 'C']):
-            dir_group = dirs[0] + phase + '/' + group
-            dir_group2 = dirs[1] + phase + '/' + group
-            for img_group in tqdm(os.listdir(dir_group)):
-                dir_img_group = dir_group + '/' + img_group
-                dir_dis_group = dir_group2 + '/' + img_group
-                for img_name in tqdm(os.listdir(dir_img_group + '/left')):
-                    img_path_1 = dir_img_group + '/left/' + img_name
-                    img_1 = Image.open(img_path_1)
-                    # img_1 = img_1.resize((width, height))
-                    # img_1 = rgba_to_rgb(img_1)
-                    img_1 = np.array(img_1)
-                    img_1_raw = img_1.tobytes()
+    l_img_path_test = []
+    r_img_path_test = []
+    d_img_path_test = []
 
-                    img_path_2 = dir_img_group + '/right/' + img_name
-                    img_2 = Image.open(img_path_2)
-                    # img_2 = img_2.resize((width, height))
-                    # img_2 = rgba_to_rgb(img_2)
-                    img_2 = np.array(img_2)
-                    img_2_raw = img_2.tobytes()
+    count_train = 0
+    count_test = 0
+    if not os.path.exists(dirs[0] + "dataset.csv") and not os.path.exists(dirs[1] + "dataset.csv"):
 
-                    disparity_path = dir_dis_group + '/left/' + img_name.split('.')[0] + '.pfm'
-                    disparity = readPFM(disparity_path)[0]
-                    disparity_raw = disparity.tobytes()
+        for phase in tqdm(['TRAIN', 'TEST']):
+            for group in tqdm(['A', 'B', 'C']):
+                dir_group = dirs[0] + phase + '/' + group
+                dir_group2 = dirs[1] + phase + '/' + group
+                for img_group in tqdm(os.listdir(dir_group)):
+                    dir_img_group = dir_group + '/' + img_group
+                    dir_dis_group = dir_group2 + '/' + img_group
+                    for img_name in tqdm(os.listdir(dir_img_group + '/left')):
+                        img_path_l = dir_img_group + '/left/' + img_name
+                        img_path_r = dir_img_group + '/right/' + img_name
+                        if not os.path.exists(dir_dis_group + '/left/' + img_name):
+                            disparity_path = dir_dis_group + '/left/' + img_name.split('.')[0] + '.pfm'
+                            data, scale = readPFM(disparity_path)
+                            cv2.imwrite(dir_dis_group + '/left/' + img_name, data)
+                        disparity_path = dir_dis_group + '/left/' + img_name
+                        if phase == 'TRAIN':
+                            l_img_path_train.append(img_path_l)
+                            r_img_path_train.append(img_path_r)
+                            d_img_path_train.append(disparity_path)
+                            count_train += 1
+                        else:
+                            l_img_path_test.append(img_path_l)
+                            r_img_path_test.append(img_path_r)
+                            d_img_path_test.append(disparity_path)
+                            count_test += 1
+        dist = {'img_l': l_img_path_train, 'img_r': r_img_path_train, "img_d": d_img_path_train}
+        pd.DataFrame(dist).to_csv(dirs[0] + "dataset.csv")
+        dist = {'img_l': l_img_path_test, 'img_r': r_img_path_test, "img_d": d_img_path_test}
+        pd.DataFrame(dist).to_csv(dirs[1] + "dataset.csv")
+    else:
+        train_dp = pd.read_csv(dirs[0] + "dataset.csv")
+        l_img_path_train = train_dp['img_l'].to_list()
+        r_img_path_train = train_dp['img_r'].to_list()
+        d_img_path_train = train_dp['img_d'].to_list()
 
-                    example = tf.train.Example(features=tf.train.Features(feature={
-                        "img_left": tf.train.Feature(bytes_list=tf.train.BytesList(value=[img_1_raw])),
-                        'img_right': tf.train.Feature(bytes_list=tf.train.BytesList(value=[img_2_raw])),
-                        'disparity': tf.train.Feature(bytes_list=tf.train.BytesList(value=[disparity_raw]))}))
+        test_dp = pd.read_csv(dirs[1] + "dataset.csv")
+        l_img_path_test = test_dp['img_l'].to_list()
+        r_img_path_test = test_dp['img_r'].to_list()
+        d_img_path_test = test_dp['img_d'].to_list()
 
-                    count += 1
-                    if phase == 'TRAIN':
-                        writer_tr.write(example.SerializeToString())
-                    else:
-                        writer_ts.write(example.SerializeToString())
-
-    writer_tr.close()
-    writer_ts.close()
+    train_ds = gen_dataset(d_img_path_train, l_img_path_train, r_img_path_train, param, "fly_train")
+    test_ds = gen_dataset(d_img_path_test, l_img_path_test, r_img_path_test, param, "fly_test")
+    return train_ds, test_ds, count_train, count_test
 
 
-def read_db(main_path, scaling=False):
+def random_crop(image_left, image_right, disparity):
+    param = params.Params()
+    batch_size = param.batch_size
+    target_w, target_h = param.target_w, param.target_h
+    concat = tf.concat([image_left, image_right, disparity], 3)
+    img_crop = tf.random_crop(concat, [batch_size, target_h, target_w, 7])
+    return img_crop[:, :, :, 0:3], img_crop[:, :, :, 3:6], img_crop[:, :, :, 6:]
+
+
+def read_db(main_path, testing=10):
     param = params.Params()
     l_img_path = os.path.join(main_path, 'left')
     r_img_path = os.path.join(main_path, 'right')
     d_img_path = os.path.join(main_path, 'depth')
-
-    writer_tr = tf.io.TFRecordWriter("dataset/my_train.tfrecords")
-    writer_ts = tf.io.TFRecordWriter("dataset/my_test.tfrecords")
-
-    count = 0
-    train_counter = 0
-    test_counter = 0
     images_ = os.listdir(l_img_path)
-    np.random.shuffle(images_)
-    p_test = 21
-    for img_name in tqdm(images_):
-        img_path_1 = os.path.join(l_img_path, img_name)
-        img_1 = cv2.imread(img_path_1, cv2.IMREAD_COLOR)
-        # img_1 = cv2.resize(img_1, (param.original_w, param.original_h))
-        img_1 = np.array(img_1)
+    all_l_image_paths = [os.path.join(l_img_path, x) for x in images_]
+    all_r_image_paths = [os.path.join(r_img_path, x) for x in images_]
+    all_d_image_paths = [os.path.join(d_img_path, x) for x in images_]
 
-        img_1_raw = img_1.tobytes()
+    l_img_path_train = all_l_image_paths[testing:]
+    r_img_path_train = all_r_image_paths[testing:]
+    d_img_path_train = all_d_image_paths[testing:]
 
-        img_path_2 = os.path.join(r_img_path, img_name)
-        img_2 = cv2.imread(img_path_2, cv2.IMREAD_COLOR)
-        # img_2 = cv2.resize(img_2, (param.original_w, param.original_h))
-        img_2 = np.array(img_2)
+    l_img_path_test = all_l_image_paths[:testing]
+    r_img_path_test = all_r_image_paths[:testing]
+    d_img_path_test = all_d_image_paths[:testing]
+    count_train = len(l_img_path_train)
+    count_test = len(l_img_path_test)
+    train_ds = gen_dataset(d_img_path_train, l_img_path_train, r_img_path_train, param, "my_train")
+    test_ds = gen_dataset(d_img_path_test, l_img_path_test, r_img_path_test, param, "my_test")
+    return train_ds, test_ds, count_train, count_test
 
-        img_2_raw = img_2.tobytes()
 
-        disparity_path = os.path.join(d_img_path, img_name)
-        disparity = cv2.imread(disparity_path, cv2.IMREAD_GRAYSCALE)
-        disparity = np.array(disparity, dtype=np.float32)
-        if scaling:
-            disparity = (param.max_disparity / disparity.max()) * disparity
-        disparity_raw = disparity.tobytes()
-        # print(disparity_raw.shape)
+def gen_dataset(d_img_path, l_img_path, r_img_path, param, file_name):
+    AUTOTUNE = tf.data.experimental.AUTOTUNE
+    image_count = len(l_img_path)
+    path_l_ds = tf.data.Dataset.from_tensor_slices(l_img_path)
+    path_r_ds = tf.data.Dataset.from_tensor_slices(r_img_path)
+    path_d_ds = tf.data.Dataset.from_tensor_slices(d_img_path)
+    image_l_ds = path_l_ds.map(lambda x: load_and_preprocess_image(x, depth=False), num_parallel_calls=AUTOTUNE)
+    image_r_ds = path_r_ds.map(lambda x: load_and_preprocess_image(x, depth=False), num_parallel_calls=AUTOTUNE)
+    image_d_ds = path_d_ds.map(lambda x: load_and_preprocess_image(x, depth=True), num_parallel_calls=AUTOTUNE)
+    images_ds = tf.data.Dataset.zip((image_l_ds, image_r_ds, image_d_ds))
+    ds = images_ds.cache(filename='./' + file_name + 'cache.tf-data')
+    ds = ds.apply(
+        tf.data.experimental.shuffle_and_repeat(buffer_size=image_count))
+    ds = ds.batch(param.batch_size).prefetch(buffer_size=AUTOTUNE).repeat()
+    ds = ds.map(random_crop)
+    return ds
 
-        example = tf.train.Example(features=tf.train.Features(feature={
-            "img_left": tf.train.Feature(bytes_list=tf.train.BytesList(value=[img_1_raw])),
-            'img_right': tf.train.Feature(bytes_list=tf.train.BytesList(value=[img_2_raw])),
-            'disparity': tf.train.Feature(bytes_list=tf.train.BytesList(value=[disparity_raw]))}))
 
-        count += 1
-        if p_test > count:
-            test_images = True
-            test_counter += 1
-        else:
-            test_images = False
-            train_counter += 1
+def timeit(ds, batches):
+    param = params.Params()
 
-        if test_images:
-            writer_ts.write(example.SerializeToString())
-        else:
-            writer_tr.write(example.SerializeToString())
+    overall_start = time.time()
+    # Fetch a single batch to prime the pipeline (fill the shuffle buffer),
+    # before starting the timer
+    it = iter(ds.take(batches + 1))
+    next(it)
 
-    writer_tr.close()
-    writer_ts.close()
-    print("Train dataset = ", train_counter)
-    print("Test dataset = ", test_counter)
+    start = time.time()
+    for i, (_, _, _) in enumerate(it):
+        if i % 10 == 0:
+            print('.', end='')
+    print()
+    end = time.time()
+
+    duration = end - start
+    print("{} batches: {} s".format(batches, duration))
+    print("{:0.5f} Images/s".format(param.batch_size * batches / duration))
+    print("Total time: {}s".format(end - overall_start))
 
 
 if __name__ == '__main__':
-    read_db("./stereo_dataset", scaling=False)
-    # read_fly_db()
+    param = params.Params()
+    train_ds, test_ds, count_train, count_test = read_fly_db()
+    steps_per_epoch = tf.ceil(count_train / param.batch_size).numpy()
+    batches = 2 * steps_per_epoch + 1
+    timeit(train_ds, batches)
+    timeit(train_ds, batches)
