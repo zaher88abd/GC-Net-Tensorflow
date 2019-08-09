@@ -15,6 +15,8 @@ import cv2
 import params
 import pandas as pd
 
+tf.enable_eager_execution()
+
 
 def readPFM(file):
     file = open(file, 'r', encoding='ISO-8859-1')
@@ -131,14 +133,16 @@ def read_fly_db():
         l_img_path_train = train_dp['img_l'].to_list()
         r_img_path_train = train_dp['img_r'].to_list()
         d_img_path_train = train_dp['img_d'].to_list()
+        count_train = len(l_img_path_train)
 
         test_dp = pd.read_csv(dirs[0] + "test_dataset.csv")
         l_img_path_test = test_dp['img_l'].to_list()
         r_img_path_test = test_dp['img_r'].to_list()
         d_img_path_test = test_dp['img_d'].to_list()
+        count_test = len(l_img_path_test)
 
-    train_ds = gen_dataset(d_img_path_train, l_img_path_train, r_img_path_train, param, "fly_train")
-    test_ds = gen_dataset(d_img_path_test, l_img_path_test, r_img_path_test, param, "fly_test")
+    train_ds = gen_dataset(d_img_path_train, l_img_path_train, r_img_path_train, param)
+    test_ds = gen_dataset(d_img_path_test, l_img_path_test, r_img_path_test, param)
     return train_ds, test_ds, count_train, count_test
 
 
@@ -170,14 +174,13 @@ def read_db(main_path, testing=10):
     d_img_path_test = all_d_image_paths[:testing]
     count_train = len(l_img_path_train)
     count_test = len(l_img_path_test)
-    train_ds = gen_dataset(d_img_path_train, l_img_path_train, r_img_path_train, param, "my_train")
-    test_ds = gen_dataset(d_img_path_test, l_img_path_test, r_img_path_test, param, "my_test")
+    train_ds = gen_dataset(d_img_path_train, l_img_path_train, r_img_path_train, param)
+    test_ds = gen_dataset(d_img_path_test, l_img_path_test, r_img_path_test, param)
     return train_ds, test_ds, count_train, count_test
 
 
-def gen_dataset(d_img_path, l_img_path, r_img_path, param, file_name):
+def gen_dataset(d_img_path, l_img_path, r_img_path, param):
     AUTOTUNE = tf.data.experimental.AUTOTUNE
-    image_count = len(l_img_path)
     path_l_ds = tf.data.Dataset.from_tensor_slices(l_img_path)
     path_r_ds = tf.data.Dataset.from_tensor_slices(r_img_path)
     path_d_ds = tf.data.Dataset.from_tensor_slices(d_img_path)
@@ -205,6 +208,7 @@ def timeit(ds, batches):
     for i, (_, _, _) in enumerate(it):
         if i % 10 == 0:
             print('.', end='')
+
     print()
     end = time.time()
 
@@ -218,6 +222,7 @@ if __name__ == '__main__':
     param = params.Params()
     train_ds, test_ds, count_train, count_test = read_fly_db()
     steps_per_epoch = tf.ceil(count_train / param.batch_size).numpy()
+    print(steps_per_epoch)
     batches = 2 * steps_per_epoch + 1
     timeit(train_ds, batches)
     timeit(train_ds, batches)
