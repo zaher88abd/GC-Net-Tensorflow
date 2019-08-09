@@ -1,7 +1,14 @@
+import os
+import time
+import params
+from util import read_fly_db, read_db
+import argparse
 import tensorflow as tf
 from tensorflow import keras as k
 from tensorflow.keras.layers import BatchNormalization, Conv2D
 from params import Params
+
+tf.enable_eager_execution()
 
 
 def conv2d_blk(img_L, img_R, name, kernel, filters, stride, phase):
@@ -149,20 +156,35 @@ def keras_asl(tgt, pred):
 
 
 if __name__ == '__main__':
-    import util
-    import params
-    import FlyingThings_TFRecord
+    parser = argparse.ArgumentParser(description='Train Keras model')
+    parser.add_argument('-f', "--fly_data", action="store_true", default=False)
+    parser.add_argument('-z', "--zed_data", action="store_true", default=False)
+    results = parser.parse_args()
 
     p = params.Params()
 
-    train_dir = 'saved_model/'
-    ds, number_ = FlyingThings_TFRecord.read_db("./stereo_dataset")
-    SUM_OF_ALL_DATASAMPLES = number_
-    STEPS_PER_EPOCH = SUM_OF_ALL_DATASAMPLES / p.batch_size
-    i, l, r = next(iter(ds))
+    train_dir = './saved_model/model'
+    if results.fly_data:
+        train_ds, test_ds, count_train, count_test = read_fly_db()
+    elif results.zed_data:
+        train_ds, test_ds, count_train, count_test = read_db("./dataset/stereo_dataset")
+
+    STEPS_PER_EPOCH_TRAIN = count_train / p.batch_size
+    STEPS_PER_EPOCH_TEST = count_test / p.batch_size
+
+    l_train, r_train, d_train = next(iter(train_ds))
+    l_test, r_test, d_test = next(iter(test_ds))
+
     model = build_model()
     opt = k.optimizers.RMSprop(lr=0.001)
-    callbacks = [k.callbacks.TensorBoard("./logk/")]
+    callbacks = [k.callbacks.TensorBoard("./log_k/")]
     print(model.summary())
     model.compile(optimizer=opt, loss=keras_asl)
-    model.fit(x=[i, l], y=[r], epochs=10, verbose=1, steps_per_epoch=STEPS_PER_EPOCH, callbacks=callbacks)
+    model.fit(x=[l_train, r_train], y=[d_train], epochs=10, verbose=1, steps_per_epoch=STEPS_PER_EPOCH_TRAIN,
+              validation_data=([l_test, r_test], d_test), validation_steps=STEPS_PER_EPOCH_TEST,
+              callbacks=callbacks)
+    if os.path.exists(train_dir):
+        train_dir += str(time.time())
+
+    train_dir += ".hdf5"
+    k.models.save_model(model=model, filepath=train_dir)
