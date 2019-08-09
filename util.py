@@ -83,9 +83,8 @@ def load_and_preprocess_image(path, depth=False):
 
 def read_fly_db():
     param = params.Params()
-    cwd = os.getcwd()
-    dirs = [cwd + '/dataset/' + 'flyingthings3d_frames_cleanpass/',
-            cwd + '/dataset/' + 'flyingthings3d__disparity/disparity/']
+    dirs = ['./dataset/' + 'flyingthings3d_frames_cleanpass/',
+            './dataset/' + 'flyingthings3d__disparity/disparity/']
 
     l_img_path_train = []
     r_img_path_train = []
@@ -97,8 +96,7 @@ def read_fly_db():
 
     count_train = 0
     count_test = 0
-    if not os.path.exists(dirs[0] + "dataset.csv") and not os.path.exists(dirs[1] + "dataset.csv"):
-
+    if not os.path.exists(dirs[0] + "train_dataset.csv") and not os.path.exists(dirs[0] + "test_dataset.csv"):
         for phase in tqdm(['TRAIN', 'TEST']):
             for group in tqdm(['A', 'B', 'C']):
                 dir_group = dirs[0] + phase + '/' + group
@@ -125,16 +123,16 @@ def read_fly_db():
                             d_img_path_test.append(disparity_path)
                             count_test += 1
         dist = {'img_l': l_img_path_train, 'img_r': r_img_path_train, "img_d": d_img_path_train}
-        pd.DataFrame(dist).to_csv(dirs[0] + "dataset.csv")
+        pd.DataFrame(dist).to_csv(dirs[0] + "train_dataset.csv")
         dist = {'img_l': l_img_path_test, 'img_r': r_img_path_test, "img_d": d_img_path_test}
-        pd.DataFrame(dist).to_csv(dirs[1] + "dataset.csv")
+        pd.DataFrame(dist).to_csv(dirs[0] + "test_dataset.csv")
     else:
-        train_dp = pd.read_csv(dirs[0] + "dataset.csv")
+        train_dp = pd.read_csv(dirs[0] + "train_dataset.csv")
         l_img_path_train = train_dp['img_l'].to_list()
         r_img_path_train = train_dp['img_r'].to_list()
         d_img_path_train = train_dp['img_d'].to_list()
 
-        test_dp = pd.read_csv(dirs[1] + "dataset.csv")
+        test_dp = pd.read_csv(dirs[0] + "test_dataset.csv")
         l_img_path_test = test_dp['img_l'].to_list()
         r_img_path_test = test_dp['img_r'].to_list()
         d_img_path_test = test_dp['img_d'].to_list()
