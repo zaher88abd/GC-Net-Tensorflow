@@ -156,9 +156,11 @@ def keras_asl(tgt, pred):
 
 
 if __name__ == '__main__':
+    tf.logging.set_verbosity(0)
     parser = argparse.ArgumentParser(description='Train Keras model')
     parser.add_argument('-f', "--fly_data", action="store_true", default=False)
     parser.add_argument('-z', "--zed_data", action="store_true", default=False)
+    parser.add_argument('-n', "--model_name", type=str, default=time.time())
     results = parser.parse_args()
 
     p = params.Params()
@@ -168,6 +170,9 @@ if __name__ == '__main__':
         train_ds, test_ds, count_train, count_test = read_fly_db()
     elif results.zed_data:
         train_ds, test_ds, count_train, count_test = read_db("./dataset/stereo_dataset")
+    else:
+        print("choose between --fly_data and --zed_data")
+        exit()
 
     STEPS_PER_EPOCH_TRAIN = count_train / p.batch_size
     STEPS_PER_EPOCH_TEST = count_test / p.batch_size
@@ -183,8 +188,5 @@ if __name__ == '__main__':
     model.fit(x=[l_train, r_train], y=[d_train], epochs=10, verbose=1, steps_per_epoch=STEPS_PER_EPOCH_TRAIN,
               validation_data=([l_test, r_test], d_test), validation_steps=STEPS_PER_EPOCH_TEST,
               callbacks=callbacks)
-    if os.path.exists(train_dir):
-        train_dir += str(time.time())
-
-    train_dir += ".hdf5"
+    train_dir += results.model_name + ".hdf5"
     k.models.save_model(model=model, filepath=train_dir)
