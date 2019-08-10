@@ -182,7 +182,10 @@ if __name__ == '__main__':
 
     model = build_model()
     opt = k.optimizers.RMSprop(lr=0.001)
-    callbacks = [k.callbacks.TensorBoard("./log_k/" + results.model_name + "/")]
+    model_checkpoint = k.callbacks.ModelCheckpoint(train_dir, monitor='val_loss', verbose=0, save_best_only=False,
+                                                   save_weights_only=False, mode='auto', save_freq=1)
+
+    callbacks = [k.callbacks.TensorBoard("./log_k/" + results.model_name + "/"), model_checkpoint]
     print(model.summary())
     model.compile(optimizer=opt, loss=keras_asl)
     model.fit(x=[l_train, r_train], y=[d_train], epochs=10, verbose=1, steps_per_epoch=STEPS_PER_EPOCH_TRAIN,
