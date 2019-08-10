@@ -8,7 +8,6 @@ from tensorflow import keras as k
 from tensorflow.keras.layers import BatchNormalization, Conv2D
 from params import Params
 
-tf.enable_eager_execution()
 
 
 def conv2d_blk(img_L, img_R, name, kernel, filters, stride, phase):
@@ -174,7 +173,8 @@ if __name__ == '__main__':
     else:
         print("choose between --fly_data and --zed_data")
         exit()
-
+    count_test = 1
+    count_train = 1
     STEPS_PER_EPOCH_TRAIN = count_train / p.batch_size
     STEPS_PER_EPOCH_TEST = count_test / p.batch_size
 
@@ -183,14 +183,13 @@ if __name__ == '__main__':
 
     model = build_model()
     opt = k.optimizers.RMSprop(lr=0.001)
-    model_checkpoint = k.callbacks.ModelCheckpoint(training_dir, monitor='val_loss', verbose=0, save_best_only=False,
-                                                   save_weights_only=False, mode='auto', save_freq=1)
 
-    callbacks = [k.callbacks.TensorBoard("./log_k/" + results.model_name + "/"), model_checkpoint]
+    callbacks = [k.callbacks.TensorBoard("./log_k/" + results.model_name + "/")]
     print(model.summary())
     model.compile(optimizer=opt, loss=keras_asl)
-    model.fit(x=[l_train, r_train], y=[d_train], epochs=3, verbose=1, steps_per_epoch=STEPS_PER_EPOCH_TRAIN,
+    model.fit(x=[l_train, r_train], y=[d_train], epochs=1, verbose=1, steps_per_epoch=STEPS_PER_EPOCH_TRAIN,
               validation_data=([l_test, r_test], d_test), validation_steps=STEPS_PER_EPOCH_TEST,
               callbacks=callbacks)
     train_dir += results.model_name + ".hdf5"
-    k.models.save_model(model=model, filepath=train_dir)
+    # k.models.save_model(model=model, filepath=train_dir)
+    tf.saved_model.save(model, train_dir)
