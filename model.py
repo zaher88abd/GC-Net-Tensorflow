@@ -165,6 +165,7 @@ if __name__ == '__main__':
 
     p = params.Params()
 
+    training_dir = './saved_model_training/model.hd5f'
     train_dir = './saved_model/model'
     if results.fly_data:
         train_ds, test_ds, count_train, count_test = read_fly_db()
@@ -182,13 +183,13 @@ if __name__ == '__main__':
 
     model = build_model()
     opt = k.optimizers.RMSprop(lr=0.001)
-    model_checkpoint = k.callbacks.ModelCheckpoint(train_dir, monitor='val_loss', verbose=0, save_best_only=False,
+    model_checkpoint = k.callbacks.ModelCheckpoint(training_dir, monitor='val_loss', verbose=0, save_best_only=False,
                                                    save_weights_only=False, mode='auto', save_freq=1)
 
     callbacks = [k.callbacks.TensorBoard("./log_k/" + results.model_name + "/"), model_checkpoint]
     print(model.summary())
     model.compile(optimizer=opt, loss=keras_asl)
-    model.fit(x=[l_train, r_train], y=[d_train], epochs=10, verbose=1, steps_per_epoch=STEPS_PER_EPOCH_TRAIN,
+    model.fit(x=[l_train, r_train], y=[d_train], epochs=3, verbose=1, steps_per_epoch=STEPS_PER_EPOCH_TRAIN,
               validation_data=([l_test, r_test], d_test), validation_steps=STEPS_PER_EPOCH_TEST,
               callbacks=callbacks)
     train_dir += results.model_name + ".hdf5"
