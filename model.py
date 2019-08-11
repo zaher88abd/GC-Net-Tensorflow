@@ -138,7 +138,8 @@ def build_model(phase=True):
 
     h_37 = deconv3d_blk(x=h_36_b, name="deconv37", kernal=(3, 3, 3), filters=1, strid=2, pahse=phase)
 
-    sqz = k.backend.squeeze(h_37, 4)
+    # sqz = tf.squeeze(h_37, 4)
+    sqz = k.layers.Lambda(k.backend.squeeze, arguments={'axis': -1})(h_37)
 
     trans = k.backend.permute_dimensions(sqz, (0, 2, 3, 1))
 
