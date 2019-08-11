@@ -7,6 +7,8 @@ import tensorflow as tf
 from tensorflow import keras as k
 from tensorflow.keras.layers import BatchNormalization, Conv2D
 from params import Params
+import numpy as np
+from PIL import Image
 
 
 def conv2d_blk(img_L, img_R, name, kernel, filters, stride, phase):
@@ -174,14 +176,7 @@ if __name__ == '__main__':
     else:
         print("choose between --fly_data and --zed_data")
         exit()
-    # if os.path.exists(results.load_model):
-    #     model = tf.saved_model.load_v2(export_dir=results.load_model)
-    #     print(type(model))
-    # else:
-    #     model = build_model()
 
-    count_test = 1
-    count_train = 1
     STEPS_PER_EPOCH_TRAIN = count_train / p.batch_size
     STEPS_PER_EPOCH_TEST = count_test / p.batch_size
 
@@ -200,4 +195,22 @@ if __name__ == '__main__':
     train_dir += results.model_name + ".h5"
     # tf.saved_model(model=model, filepath=train_dir)
     tf.saved_model.save(model, train_dir)
+
+    # Convert from [0, 255] -> [-0.5, 0.5] floats.
+    img_1 = np.asarray(Image.open("./dataset/flyingthings3d_frames_cleanpass/TRAIN/A/0000/left/0006.png").resize(
+        (p.target_w, p.target_h))) * (1. / 255) - 0.5
+    img_2 = np.asarray(Image.open("./dataset/flyingthings3d_frames_cleanpass/TRAIN/A/0000/left/0006.png").resize(
+        (p.target_w, p.target_h))) * (1. / 255) - 0.5
+    f_out = model.predict(x=[img_1, img_2])
+    im_out = Image.fromarray(np.reshape(f_out[0], (p.target_h, p.target_w)) / 191.0 * 255.0).convert('RGB')
+    im_out.save('./output_img/train_.jpg')
+
+    # Convert from [0, 255] -> [-0.5, 0.5] floats.
+    img_1 = np.asarray(Image.open("./dataset/flyingthings3d_frames_cleanpass/TEST/A/0000/left/0006.png").resize(
+        (p.target_w, p.target_h))) * (1. / 255) - 0.5
+    img_2 = np.asarray(Image.open("./dataset/flyingthings3d_frames_cleanpass/TEST/A/0000/left/0006.png").resize(
+        (p.target_w, p.target_h))) * (1. / 255) - 0.5
+    f_out = model.predict(x=[img_1, img_2])
+    im_out = Image.fromarray(np.reshape(f_out[0], (p.target_h, p.target_w)) / 191.0 * 255.0).convert('RGB')
+    im_out.save('./output_img/test_.jpg')
     print("***Error***")
