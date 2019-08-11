@@ -176,7 +176,8 @@ if __name__ == '__main__':
     else:
         print("choose between --fly_data and --zed_data")
         exit()
-
+    count_train = 5
+    count_test = 5
     STEPS_PER_EPOCH_TRAIN = count_train / p.batch_size
     STEPS_PER_EPOCH_TEST = count_test / p.batch_size
 
@@ -184,8 +185,10 @@ if __name__ == '__main__':
     l_test, r_test, d_test = next(iter(test_ds))
 
     opt = k.optimizers.RMSprop(lr=0.001)
+    model_check_point = k.callbacks.ModelCheckpoint(training_dir, monitor='val_loss', verbose=0, save_best_only=False,
+                                                    save_weights_only=False, mode='auto', period=1)
 
-    callbacks = [k.callbacks.TensorBoard("./log_k/" + results.model_name + "/")]
+    callbacks = [k.callbacks.TensorBoard("./log_k/" + results.model_name + "/"), model_check_point]
     model = build_model()
     print(model.summary())
     model.compile(optimizer=opt, loss=keras_asl)
@@ -201,7 +204,7 @@ if __name__ == '__main__':
         (p.target_w, p.target_h))) * (1. / 255) - 0.5
     img_2 = np.asarray(Image.open("./dataset/flyingthings3d_frames_cleanpass/TRAIN/A/0000/left/0006.png").resize(
         (p.target_w, p.target_h))) * (1. / 255) - 0.5
-    f_out = model.predict(x=[img_1, img_2])
+    f_out = model.predict(x=[img_1, img_2], batch_size=1)
     im_out = Image.fromarray(np.reshape(f_out[0], (p.target_h, p.target_w)) / 191.0 * 255.0).convert('RGB')
     im_out.save('./output_img/train_.jpg')
 
@@ -210,7 +213,7 @@ if __name__ == '__main__':
         (p.target_w, p.target_h))) * (1. / 255) - 0.5
     img_2 = np.asarray(Image.open("./dataset/flyingthings3d_frames_cleanpass/TEST/A/0000/left/0006.png").resize(
         (p.target_w, p.target_h))) * (1. / 255) - 0.5
-    f_out = model.predict(x=[img_1, img_2])
+    f_out = model.predict(x=[img_1, img_2], batch_size=1)
     im_out = Image.fromarray(np.reshape(f_out[0], (p.target_h, p.target_w)) / 191.0 * 255.0).convert('RGB')
     im_out.save('./output_img/test_.jpg')
     print("***Error***")
