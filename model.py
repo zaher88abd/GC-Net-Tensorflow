@@ -199,15 +199,20 @@ if __name__ == '__main__':
               validation_data=([l_test, r_test], d_test), validation_steps=STEPS_PER_EPOCH_TEST,
               callbacks=callbacks)
     train_dir += results.model_name + ".h5"
-    # tf.saved_model(model=model, filepath=train_dir)
-    tf.saved_model.save(model, train_dir)
+    print("Saving model")
+    model.save(train_dir)
+    # tf.saved_model.save(model, train_dir)
+    model_ = k.models.load_model(train_dir)
 
     # Convert from [0, 255] -> [-0.5, 0.5] floats.
     img_1 = np.asarray(Image.open("./dataset/flyingthings3d_frames_cleanpass/TRAIN/A/0000/left/0006.png").resize(
         (p.target_w, p.target_h))) * (1. / 255) - 0.5
     img_2 = np.asarray(Image.open("./dataset/flyingthings3d_frames_cleanpass/TRAIN/A/0000/left/0006.png").resize(
         (p.target_w, p.target_h))) * (1. / 255) - 0.5
-    f_out = model.predict(x=[img_1, img_2], batch_size=1)
+    img_1 = np.expand_dims(img_1, axis=0)
+    img_2 = np.expand_dims(img_2, axis=0)
+
+    f_out = model_.predict(x=[img_1, img_2], batch_size=1)
     im_out = Image.fromarray(np.reshape(f_out[0], (p.target_h, p.target_w)) / 191.0 * 255.0).convert('RGB')
     im_out.save('./output_img/train_.jpg')
 
@@ -216,7 +221,10 @@ if __name__ == '__main__':
         (p.target_w, p.target_h))) * (1. / 255) - 0.5
     img_2 = np.asarray(Image.open("./dataset/flyingthings3d_frames_cleanpass/TEST/A/0000/left/0006.png").resize(
         (p.target_w, p.target_h))) * (1. / 255) - 0.5
-    f_out = model.predict(x=[img_1, img_2], batch_size=1)
+    img_1 = np.expand_dims(img_1, axis=0)
+    img_2 = np.expand_dims(img_2, axis=0)
+
+    f_out = model_.predict(x=[img_1, img_2], batch_size=1)
     im_out = Image.fromarray(np.reshape(f_out[0], (p.target_h, p.target_w)) / 191.0 * 255.0).convert('RGB')
     im_out.save('./output_img/test_.jpg')
     print("***Error***")
