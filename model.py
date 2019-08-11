@@ -145,7 +145,8 @@ def build_model(phase=True):
     trans = k.layers.Lambda(k.backend.permute_dimensions, arguments={'pattern': (0, 2, 3, 1)})(sqz)
 
     neg = k.layers.Lambda(lambda x: -x)(trans)
-    logits = k.activations.softmax(neg)
+    # logits = k.activations.softmax(neg)
+    logits = k.layers.Lambda(k.activations.softmax)(neg)
 
     distrib = k.layers.Conv2D(kernel_size=(1, 1), padding="same",
                               filters=1, strides=1, trainable=phase, name="output")(logits)
