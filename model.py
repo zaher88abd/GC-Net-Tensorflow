@@ -141,7 +141,8 @@ def build_model(phase=True):
     # sqz = tf.squeeze(h_37, 4)
     sqz = k.layers.Lambda(k.backend.squeeze, arguments={'axis': -1})(h_37)
 
-    trans = k.backend.permute_dimensions(sqz, (0, 2, 3, 1))
+    # trans = k.backend.permute_dimensions(sqz, (0, 2, 3, 1))
+    trans = k.layers.Lambda(k.backend.permute_dimensions, arguments={'pattern': (0, 2, 3, 1)})(sqz)
 
     neg = k.layers.Lambda(lambda x: -x)(trans)
     logits = k.activations.softmax(neg)
