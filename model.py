@@ -9,7 +9,6 @@ from tensorflow.keras.layers import BatchNormalization, Conv2D
 from params import Params
 
 
-
 def conv2d_blk(img_L, img_R, name, kernel, filters, stride, phase):
     conv2_scope = k.layers.Conv2D(name=name, kernel_size=kernel, filters=filters, strides=[stride, stride],
                                   padding="same", trainable=phase)
@@ -160,11 +159,13 @@ if __name__ == '__main__':
     parser.add_argument('-f', "--fly_data", action="store_true", default=False)
     parser.add_argument('-z', "--zed_data", action="store_true", default=False)
     parser.add_argument('-n', "--model_name", type=str, default=time.time())
+    parser.add_argument('-l', "--load_model", type=str,
+                        default="/mnt/ExtStorge/Git/projects/GC-Net-Tensorflow/saved_model/modelmod.h5")
     results = parser.parse_args()
 
     p = params.Params()
 
-    training_dir = './saved_model_training/model.hd5f'
+    training_dir = './saved_model_training/model.h5'
     train_dir = './saved_model/model'
     if results.fly_data:
         train_ds, test_ds, count_train, count_test = read_fly_db()
@@ -173,6 +174,12 @@ if __name__ == '__main__':
     else:
         print("choose between --fly_data and --zed_data")
         exit()
+    # if os.path.exists(results.load_model):
+    #     model = tf.saved_model.load_v2(export_dir=results.load_model)
+    #     print(type(model))
+    # else:
+    #     model = build_model()
+
     count_test = 1
     count_train = 1
     STEPS_PER_EPOCH_TRAIN = count_train / p.batch_size
@@ -181,15 +188,16 @@ if __name__ == '__main__':
     l_train, r_train, d_train = next(iter(train_ds))
     l_test, r_test, d_test = next(iter(test_ds))
 
-    model = build_model()
     opt = k.optimizers.RMSprop(lr=0.001)
 
     callbacks = [k.callbacks.TensorBoard("./log_k/" + results.model_name + "/")]
+    model = build_model()
     print(model.summary())
     model.compile(optimizer=opt, loss=keras_asl)
     model.fit(x=[l_train, r_train], y=[d_train], epochs=1, verbose=1, steps_per_epoch=STEPS_PER_EPOCH_TRAIN,
               validation_data=([l_test, r_test], d_test), validation_steps=STEPS_PER_EPOCH_TEST,
               callbacks=callbacks)
-    train_dir += results.model_name + ".hdf5"
-    # k.models.save_model(model=model, filepath=train_dir)
+    train_dir += results.model_name + ".h5"
+    # tf.saved_model(model=model, filepath=train_dir)
     tf.saved_model.save(model, train_dir)
+    print("***Error***")
