@@ -164,8 +164,7 @@ if __name__ == '__main__':
     parser.add_argument('-f', "--fly_data", action="store_true", default=False)
     parser.add_argument('-z', "--zed_data", action="store_true", default=False)
     parser.add_argument('-n', "--model_name", type=str, default=time.time())
-    parser.add_argument('-l', "--load_model", type=str,
-                        default="/mnt/ExtStorge/Git/projects/GC-Net-Tensorflow/saved_model/modelmod.h5")
+    parser.add_argument('-l', "--load_model", type=str, default=None)
     results = parser.parse_args()
 
     p = params.Params()
@@ -178,53 +177,62 @@ if __name__ == '__main__':
         train_ds, test_ds, count_train, count_test = read_db("./dataset/stereo_dataset")
     else:
         print("choose between --fly_data and --zed_data")
-        exit()
-    count_train = 5
-    count_test = 5
-    STEPS_PER_EPOCH_TRAIN = count_train / p.batch_size
-    STEPS_PER_EPOCH_TEST = count_test / p.batch_size
+    if results.load_model is not None:
+        model = build_model()
+        print("Load model")
+        model.load_weights(results.load_model)
+    else:
+        print("Build model")
+        model = build_model()
 
-    l_train, r_train, d_train = next(iter(train_ds))
-    l_test, r_test, d_test = next(iter(test_ds))
+        count_train = 5
+        count_test = 5
+        STEPS_PER_EPOCH_TRAIN = count_train / p.batch_size
+        STEPS_PER_EPOCH_TEST = count_test / p.batch_size
 
-    opt = k.optimizers.RMSprop(lr=0.001)
-    model_check_point = k.callbacks.ModelCheckpoint(training_dir, monitor='val_loss', verbose=0, save_best_only=False,
-                                                    save_weights_only=False, mode='auto', period=1)
+        l_train, r_train, d_train = next(iter(train_ds))
+        l_test, r_test, d_test = next(iter(test_ds))
 
-    callbacks = [k.callbacks.TensorBoard("./log_k/" + results.model_name + "/"), model_check_point]
-    model = build_model()
-    print(model.summary())
-    model.compile(optimizer=opt, loss=keras_asl)
-    model.fit(x=[l_train, r_train], y=[d_train], epochs=1, verbose=1, steps_per_epoch=STEPS_PER_EPOCH_TRAIN,
-              validation_data=([l_test, r_test], d_test), validation_steps=STEPS_PER_EPOCH_TEST,
-              callbacks=callbacks)
-    train_dir += results.model_name + ".h5"
-    print("Saving model")
-    model.save(train_dir)
-    # tf.saved_model.save(model, train_dir)
-    model_ = k.models.load_model(train_dir)
+        opt = k.optimizers.RMSprop(lr=0.001)
+        model_check_point = k.callbacks.ModelCheckpoint(training_dir, monitor='val_loss', verbose=0,
+                                                        save_best_only=False,
+                                                        save_weights_only=False, mode='auto', period=1)
+
+        callbacks = [k.callbacks.TensorBoard("./log_k/" + results.model_name + "/"), model_check_point]
+        print(model.summary())
+        model.compile(optimizer=opt, loss=keras_asl)
+        model.fit(x=[l_train, r_train], y=[d_train], epochs=3, verbose=1, steps_per_epoch=STEPS_PER_EPOCH_TRAIN,
+                  validation_data=([l_test, r_test], d_test), validation_steps=STEPS_PER_EPOCH_TEST,
+                  callbacks=callbacks)
+        train_dir += results.model_name + ".h5"
+        print("Saving model")
+        if os.path.exists(train_dir):
+            os.remove(train_dir)
+        model.save(train_dir)
+        # # tf.saved_model.save(model, train_dir)
+        # model_ = k.models.load_model(train_dir)
 
     # Convert from [0, 255] -> [-0.5, 0.5] floats.
-    img_1 = np.asarray(Image.open("./dataset/flyingthings3d_frames_cleanpass/TRAIN/A/0000/left/0006.png").resize(
+    img_1 = np.asarray(Image.open("./dataset/flyingthings3d_frames_cleanpass/TRAIN/A/0000/left/0008.png").resize(
         (p.target_w, p.target_h))) * (1. / 255) - 0.5
-    img_2 = np.asarray(Image.open("./dataset/flyingthings3d_frames_cleanpass/TRAIN/A/0000/left/0006.png").resize(
+    img_2 = np.asarray(Image.open("./dataset/flyingthings3d_frames_cleanpass/TRAIN/A/0000/right/0008.png").resize(
         (p.target_w, p.target_h))) * (1. / 255) - 0.5
     img_1 = np.expand_dims(img_1, axis=0)
     img_2 = np.expand_dims(img_2, axis=0)
 
-    f_out = model_.predict(x=[img_1, img_2], batch_size=1)
+    f_out = model.predict(x=[img_1, img_2], batch_size=1)
     im_out = Image.fromarray(np.reshape(f_out[0], (p.target_h, p.target_w)) / 191.0 * 255.0).convert('RGB')
     im_out.save('./output_img/train_.jpg')
 
     # Convert from [0, 255] -> [-0.5, 0.5] floats.
     img_1 = np.asarray(Image.open("./dataset/flyingthings3d_frames_cleanpass/TEST/A/0000/left/0006.png").resize(
         (p.target_w, p.target_h))) * (1. / 255) - 0.5
-    img_2 = np.asarray(Image.open("./dataset/flyingthings3d_frames_cleanpass/TEST/A/0000/left/0006.png").resize(
+    img_2 = np.asarray(Image.open("./dataset/flyingthings3d_frames_cleanpass/TEST/A/0000/right/0006.png").resize(
         (p.target_w, p.target_h))) * (1. / 255) - 0.5
     img_1 = np.expand_dims(img_1, axis=0)
     img_2 = np.expand_dims(img_2, axis=0)
 
-    f_out = model_.predict(x=[img_1, img_2], batch_size=1)
+    f_out = model.predict(x=[img_1, img_2], batch_size=1)
     im_out = Image.fromarray(np.reshape(f_out[0], (p.target_h, p.target_w)) / 191.0 * 255.0).convert('RGB')
     im_out.save('./output_img/test_.jpg')
     print("***Error***")
