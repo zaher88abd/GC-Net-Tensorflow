@@ -177,6 +177,7 @@ if __name__ == '__main__':
         train_ds, test_ds, count_train, count_test = read_db("./dataset/stereo_dataset")
     else:
         print("choose between --fly_data and --zed_data")
+
     if results.load_model is not None:
         model = build_model()
         print("Load model")
