@@ -194,7 +194,7 @@ if __name__ == '__main__':
         l_train, r_train, d_train = next(iter(train_ds))
         l_test, r_test, d_test = next(iter(test_ds))
 
-        opt = k.optimizers.RMSprop(lr=0.001)
+        opt = k.optimizers.RMSprop(lr=0.001, decay=0)
         model_check_point = k.callbacks.ModelCheckpoint(training_dir, monitor='val_loss', verbose=0,
                                                         save_best_only=False,
                                                         save_weights_only=False, mode='auto', period=1)
