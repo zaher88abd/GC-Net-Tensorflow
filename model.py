@@ -199,7 +199,8 @@ if __name__ == '__main__':
                                                         save_best_only=False,
                                                         save_weights_only=False, mode='auto', period=1)
 
-        callbacks = [k.callbacks.TensorBoard("./log_k/" + results.model_name + "/"), model_check_point]
+        callbacks = [k.callbacks.TensorBoard("./log_k/" + results.model_name + "/", update_freq='batch'),
+                     model_check_point]
         print(model.summary())
         model.compile(optimizer=opt, loss=keras_asl)
         model.fit(x=[l_train, r_train], y=[d_train], epochs=3, verbose=1, steps_per_epoch=STEPS_PER_EPOCH_TRAIN,
