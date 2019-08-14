@@ -142,17 +142,20 @@ def build_model(phase=True):
     sqz = k.layers.Lambda(k.backend.squeeze, arguments={'axis': -1})(h_37)
 
     # trans = k.backend.permute_dimensions(sqz, (0, 2, 3, 1))
-    # trans = k.layers.Lambda(k.backend.permute_dimensions, arguments={'pattern': (0, 2, 3, 1)})(sqz)
 
     neg = k.layers.Lambda(lambda x: -x)(sqz)
     # logits = k.activations.softmax(neg)
     logits = k.layers.Lambda(k.activations.softmax)(neg)
     disp_map = k.backend.reshape(k.backend.arange(0, parameters.max_disparity, dtype='float32'),
                                  (1, 1, parameters.max_disparity, 1))
-    distrib = k.backend.conv2d(logits, disp_map, strides=(1, 1), data_format='channels_first', padding='valid')
-    output = k.layers.Lambda(k.backend.squeeze, arguments={'axis': 1})(distrib)
+    trans = k.layers.Lambda(k.backend.permute_dimensions, arguments={'pattern': (0, 2, 3, 1)})(logits)
 
-    return k.models.Model(inputs=[input_l, input_r], outputs=output)
+    distrib = k.layers.Lambda(k.backend.conv2d, arguments={'kernel': disp_map, 'strides': (1, 1),
+                                                           'data_format': 'channels_last', 'padding': 'valid'})(trans)
+    # distrib = k.backend.conv2d(trans, disp_map, strides=(1, 1), data_format='channels_last', padding='valid')
+    # output = k.layers.Lambda(k.backend.squeeze, arguments={'axis': 1})(distrib)
+
+    return k.models.Model(inputs=[input_l, input_r], outputs=distrib)
 
 
 def keras_asl(tgt, pred):
