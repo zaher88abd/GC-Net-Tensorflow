@@ -9,6 +9,22 @@ from tensorflow.keras.layers import BatchNormalization, Conv2D
 from params import Params
 import numpy as np
 from PIL import Image
+from tensorflow.keras.layers import Layer
+
+tf.enable_eager_execution()
+
+
+class OutLayer(Layer):
+    def __init__(self, max_disp):
+        super(OutLayer, self).__init__()
+        self.max_disp = max_disp
+
+    def call(self, input_tensor):
+        kernal = k.backend.reshape(k.backend.arange(0, self.max_disp, dtype='float32'),
+                                   (1, 1, self.max_disp, 1))
+
+        return k.backend.conv2d(x=input_tensor, kernel=kernal, strides=(1, 1), data_format='channels_last',
+                                padding='valid')
 
 
 def conv2d_blk(img_L, img_R, name, kernel, filters, stride, phase):
@@ -146,16 +162,16 @@ def build_model(phase=True):
     neg = k.layers.Lambda(lambda x: -x)(sqz)
     # logits = k.activations.softmax(neg)
     logits = k.layers.Lambda(k.activations.softmax)(neg)
-    disp_map = k.backend.reshape(k.backend.arange(0, parameters.max_disparity, dtype='float32'),
-                                 (1, 1, parameters.max_disparity, 1))
+    # disp_map = k.backend.reshape(k.backend.arange(0, parameters.max_disparity, dtype='float32'),
+    #                              (1, 1, parameters.max_disparity, 1))
     trans = k.layers.Lambda(k.backend.permute_dimensions, arguments={'pattern': (0, 2, 3, 1)})(logits)
 
-    distrib = k.layers.Lambda(k.backend.conv2d, arguments={'kernel': disp_map, 'strides': (1, 1),
-                                                           'data_format': 'channels_last', 'padding': 'valid'})(trans)
+    # distrib = k.layers.Lambda(k.backend.conv2d, arguments={'kernel': disp_map, 'strides': (1, 1),
+    #                                                        'data_format': 'channels_last', 'padding': 'valid'})(trans)
     # distrib = k.backend.conv2d(trans, disp_map, strides=(1, 1), data_format='channels_last', padding='valid')
     # output = k.layers.Lambda(k.backend.squeeze, arguments={'axis': 1})(distrib)
-
-    return k.models.Model(inputs=[input_l, input_r], outputs=distrib)
+    output = OutLayer(max_disp=parameters.max_disparity)(trans)
+    return k.models.Model(inputs=[input_l, input_r], outputs=output)
 
 
 def keras_asl(tgt, pred):
@@ -206,6 +222,7 @@ if __name__ == '__main__':
         callbacks = [k.callbacks.TensorBoard("./log_k/" + results.model_name + "/", update_freq='batch'),
                      model_check_point]
         print(model.summary())
+
         model.compile(optimizer=opt, loss=keras_asl)
         model.fit(x=[l_train, r_train], y=[d_train], epochs=3, verbose=1, steps_per_epoch=STEPS_PER_EPOCH_TRAIN,
                   validation_data=([l_test, r_test], d_test), validation_steps=STEPS_PER_EPOCH_TEST,
