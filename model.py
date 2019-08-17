@@ -206,15 +206,14 @@ if __name__ == '__main__':
         print("Build model")
         model = build_model()
 
-        count_train = 5
-        count_test = 5
         STEPS_PER_EPOCH_TRAIN = count_train / p.batch_size
         STEPS_PER_EPOCH_TEST = count_test / p.batch_size
 
         l_train, r_train, d_train = next(iter(train_ds))
         l_test, r_test, d_test = next(iter(test_ds))
-
-        opt = k.optimizers.RMSprop(lr=0.001, decay=0)
+        epochs = 3
+        learning_rate = 0.001
+        opt = k.optimizers.Adam(lr=learning_rate, decay=learning_rate / epochs)
         model_check_point = k.callbacks.ModelCheckpoint(training_dir, monitor='val_loss', verbose=0,
                                                         save_best_only=False,
                                                         save_weights_only=False, mode='auto', period=1)
@@ -223,9 +222,9 @@ if __name__ == '__main__':
                      model_check_point]
         print(model.summary())
 
-        model.compile(optimizer=opt, loss=keras_asl)
+        model.compile(optimizer=opt, loss=tf.keras.losses.MeanAbsoluteError)
         model.fit(x=[l_train, r_train], y=[d_train], epochs=3, verbose=1, steps_per_epoch=STEPS_PER_EPOCH_TRAIN,
-                  validation_data=([l_test, r_test], d_test), validation_steps=STEPS_PER_EPOCH_TEST,
+                  validation_data=([l_test, r_test], [d_test]), validation_steps=STEPS_PER_EPOCH_TEST,
                   callbacks=callbacks)
         train_dir += results.model_name + ".h5"
         print("Saving model")
