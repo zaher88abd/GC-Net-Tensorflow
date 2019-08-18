@@ -23,17 +23,21 @@ class OutLayer(Layer):
         kernal = k.backend.reshape(k.backend.arange(0, self.max_disp, dtype='float32'),
                                    (1, 1, self.max_disp, 1))
 
-        return k.backend.conv2d(x=input_tensor, kernel=kernal, strides=(1, 1), data_format='channels_last',
-                                padding='valid')
+        return k.backend.conv2d(x=input_tensor, kernel=kernal, strides=(1, 1),
+                                data_format='channels_last', padding='valid')
 
 
-def conv2d_blk(img_L, img_R, name, kernel, filters, stride, phase):
+def conv2d_blk(img_L, img_R, name, kernel, filters, stride, phase, norm_activ=True):
     conv2_scope = k.layers.Conv2D(name=name, kernel_size=kernel, filters=filters, strides=[stride, stride],
                                   padding="same", trainable=phase)
-    btn = k.layers.BatchNormalization(axis=-1, trainable=phase)
-    act = k.layers.Activation("relu", trainable=phase)
-    h_1_L = act(btn(conv2_scope(img_L)))
-    h_1_R = act(btn(conv2_scope(img_R)))
+    if norm_activ:
+        btn = k.layers.BatchNormalization(axis=-1, trainable=phase)
+        act = k.layers.Activation("relu", trainable=phase)
+        h_1_L = act(btn(conv2_scope(img_L)))
+        h_1_R = act(btn(conv2_scope(img_R)))
+        return h_1_L, h_1_R
+    h_1_L = conv2_scope(img_L)
+    h_1_R = conv2_scope(img_R)
     return h_1_L, h_1_R
 
 
@@ -118,13 +122,13 @@ def build_model(phase=True):
     h_13_L, h_13_R = res_blk(h_11_L, h_11_R, name="res11-13", kernel=(3, 3), filters=32, stride=1, phase=phase)
     h_15_L, h_15_R = res_blk(h_13_L, h_13_R, name="res14-15", kernel=(3, 3), filters=32, stride=1, phase=phase)
     h_17_L, h_17_R = res_blk(h_15_L, h_15_R, name="res16-17", kernel=(3, 3), filters=32, stride=1, phase=phase)
-    h_18_L, h_18_R = conv2d_blk(h_17_L, h_17_R, name="conv18", kernel=(3, 3), filters=32, stride=1, phase=phase)
+    h_18_L, h_18_R = conv2d_blk(h_17_L, h_17_R, name="conv18", kernel=(3, 3), filters=32, stride=1, phase=phase,
+                                norm_activ=False)
 
     # corr = cost_volume(h_18_L, h_18_R, parameters.max_disparity)
     corr = k.layers.Lambda(_getCostVolume_, arguments={'max_d': parameters.max_disparity / 2},
                            output_shape=(parameters.max_disparity / 2, None, None, 32 * 2))([h_18_L, h_18_R])
 
-    # print("Shape corr", corr.get_shape())
     h_19 = conv3d_blk(x=corr, name="conv19", kernel=(3, 3, 3), filters=32, strid=1, phase=phase)
     h_20 = conv3d_blk(x=h_19, name="conv20", kernel=(3, 3, 3), filters=32, strid=1, phase=phase)
     h_21 = conv3d_blk(x=corr, name="conv21", kernel=(3, 3, 3), filters=64, strid=2, phase=phase)
@@ -154,23 +158,15 @@ def build_model(phase=True):
 
     h_37 = deconv3d_blk(x=h_36_b, name="deconv37", kernal=(3, 3, 3), filters=1, strid=2, pahse=phase)
 
-    # sqz = tf.squeeze(h_37, 4)
-    sqz = k.layers.Lambda(k.backend.squeeze, arguments={'axis': -1})(h_37)
-
-    # trans = k.backend.permute_dimensions(sqz, (0, 2, 3, 1))
+    sqz = k.layers.Lambda(k.backend.squeeze, arguments={'axis': 4})(h_37)
 
     neg = k.layers.Lambda(lambda x: -x)(sqz)
-    # logits = k.activations.softmax(neg)
-    logits = k.layers.Lambda(k.activations.softmax)(neg)
-    # disp_map = k.backend.reshape(k.backend.arange(0, parameters.max_disparity, dtype='float32'),
-    #                              (1, 1, parameters.max_disparity, 1))
-    trans = k.layers.Lambda(k.backend.permute_dimensions, arguments={'pattern': (0, 2, 3, 1)})(logits)
 
-    # distrib = k.layers.Lambda(k.backend.conv2d, arguments={'kernel': disp_map, 'strides': (1, 1),
-    #                                                        'data_format': 'channels_last', 'padding': 'valid'})(trans)
-    # distrib = k.backend.conv2d(trans, disp_map, strides=(1, 1), data_format='channels_last', padding='valid')
-    # output = k.layers.Lambda(k.backend.squeeze, arguments={'axis': 1})(distrib)
-    output = OutLayer(max_disp=parameters.max_disparity)(trans)
+    trans = k.layers.Lambda(k.backend.permute_dimensions, arguments={'pattern': (0, 2, 3, 1)})(neg)
+
+    logits = k.layers.Lambda(k.activations.softmax)(trans)
+
+    output = OutLayer(max_disp=parameters.max_disparity)(logits)
     return k.models.Model(inputs=[input_l, input_r], outputs=output)
 
 
@@ -190,7 +186,7 @@ if __name__ == '__main__':
     p = params.Params()
 
     training_dir = './saved_model_training/model.h5'
-    train_dir = './saved_model/model'
+    train_dir = './saved_model/model_'
     if results.fly_data:
         train_ds, test_ds, count_train, count_test = read_fly_db()
     elif results.zed_data:
@@ -213,24 +209,28 @@ if __name__ == '__main__':
         l_test, r_test, d_test = next(iter(test_ds))
         epochs = 3
         learning_rate = 0.001
-        opt = k.optimizers.Adam(lr=learning_rate, decay=learning_rate / epochs)
-        model_check_point = k.callbacks.ModelCheckpoint(training_dir, monitor='val_loss', verbose=0,
-                                                        save_best_only=False,
-                                                        save_weights_only=False, mode='auto', period=1)
+        opt = k.optimizers.RMSprop(lr=learning_rate, decay=learning_rate / epochs)
+        model_check_point = k.callbacks.ModelCheckpoint(training_dir, monitor='val_loss',
+                                                        verbose=0, save_best_only=False,
+                                                        save_weights_only=False, mode='auto',
+                                                        period=1)
 
-        callbacks = [k.callbacks.TensorBoard("./log_k/" + results.model_name + "/", update_freq='batch'),
-                     model_check_point]
-        print(model.summary())
-
-        model.compile(optimizer=opt, loss=tf.keras.losses.MeanAbsoluteError)
+        callbacks = [k.callbacks.TensorBoard("./log_k/" + results.model_name + "/",
+                                             update_freq='batch'), model_check_point]
+        model.summary()
+        model.compile(optimizer=opt, loss=tf.keras.losses.mean_absolute_error)
         model.fit(x=[l_train, r_train], y=[d_train], epochs=3, verbose=1, steps_per_epoch=STEPS_PER_EPOCH_TRAIN,
                   validation_data=([l_test, r_test], [d_test]), validation_steps=STEPS_PER_EPOCH_TEST,
                   callbacks=callbacks)
-        train_dir += results.model_name + ".h5"
+        train_dir += results.model_name
+        model_json = model.to_json()
+        with open(train_dir + ".json", "w") as json_file:
+            json_file.write(model_json)
+
         print("Saving model")
         if os.path.exists(train_dir):
             os.remove(train_dir)
-        model.save(train_dir)
+        model.save(train_dir + ".h5")
         # # tf.saved_model.save(model, train_dir)
         # model_ = k.models.load_model(train_dir)
 
