@@ -202,14 +202,14 @@ if __name__ == '__main__':
         print("Build model")
         model = build_model()
 
-        STEPS_PER_EPOCH_TRAIN = count_train / p.batch_size
-        STEPS_PER_EPOCH_TEST = count_test / p.batch_size
+        STEPS_PER_EPOCH_TRAIN = 100
+        STEPS_PER_EPOCH_TEST = 10
 
         l_train, r_train, d_train = next(iter(train_ds))
         l_test, r_test, d_test = next(iter(test_ds))
-        epochs = 3
+        epochs = 600
         learning_rate = 0.001
-        opt = k.optimizers.RMSprop(lr=learning_rate, decay=learning_rate / epochs)
+        opt = k.optimizers.RMSprop(lr=learning_rate, decay=0)
         model_check_point = k.callbacks.ModelCheckpoint(training_dir, monitor='val_loss',
                                                         verbose=0, save_best_only=False,
                                                         save_weights_only=False, mode='auto',
@@ -218,8 +218,8 @@ if __name__ == '__main__':
         callbacks = [k.callbacks.TensorBoard("./log_k/" + results.model_name + "/",
                                              update_freq='batch'), model_check_point]
         model.summary()
-        model.compile(optimizer=opt, loss=tf.keras.losses.mean_absolute_error)
-        model.fit(x=[l_train, r_train], y=[d_train], epochs=3, verbose=1, steps_per_epoch=STEPS_PER_EPOCH_TRAIN,
+        model.compile(optimizer=opt, loss=keras_asl)
+        model.fit(x=[l_train, r_train], y=[d_train], epochs=epochs, verbose=1, steps_per_epoch=STEPS_PER_EPOCH_TRAIN,
                   validation_data=([l_test, r_test], [d_test]), validation_steps=STEPS_PER_EPOCH_TEST,
                   callbacks=callbacks)
         train_dir += results.model_name
