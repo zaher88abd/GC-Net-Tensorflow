@@ -68,13 +68,14 @@ def res_blk(h_conv1_L, h_conv1_R, name, kernel, filters, stride, phase):
     return h_conv3_L_c, h_conv3_R_c
 
 
-def cost_volume(img_L, img_R, d_size):
+def cost_volume(inputs, max_d):
     """
     Cost Volume - each pixel in img_L concat horizontally across img_R
     """
-    d = int(d_size / 2 - 1)
-    dp_list = []
 
+    d = int(max_d / 2 - 1)
+    dp_list = []
+    img_L, img_R = inputs
     # when disparity is 0
     elw_tf = tf.concat([img_L, img_R], axis=3, name="concat0")
     dp_list.append(elw_tf)
@@ -126,7 +127,7 @@ def build_model(phase=True):
                                 norm_activ=False)
 
     # corr = cost_volume(h_18_L, h_18_R, parameters.max_disparity)
-    corr = k.layers.Lambda(_getCostVolume_, arguments={'max_d': parameters.max_disparity / 2},
+    corr = k.layers.Lambda(cost_volume, arguments={'max_d': parameters.max_disparity },
                            output_shape=(parameters.max_disparity / 2, None, None, 32 * 2))([h_18_L, h_18_R])
 
     h_19 = conv3d_blk(x=corr, name="conv19", kernel=(3, 3, 3), filters=32, strid=1, phase=phase)
@@ -214,6 +215,7 @@ if __name__ == '__main__':
                                                         verbose=0, save_best_only=False,
                                                         save_weights_only=False, mode='auto',
                                                         period=1)
+
 
         callbacks = [k.callbacks.TensorBoard("./log_k/" + results.model_name + "/",
                                              update_freq='batch'), model_check_point]
