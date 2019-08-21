@@ -170,8 +170,8 @@ def build_model(phase=True):
     return k.models.Model(inputs=[input_l, input_r], outputs=output)
 
 
-def keras_asl(tgt, pred):
-    return tf.compat.v1.losses.absolute_difference(predictions=pred, labels=tgt)
+def keras_asl(y_true, y_pred):
+    return tf.compat.v1.losses.absolute_difference(predictions=y_pred, labels=y_true)
 
 
 if __name__ == '__main__':
@@ -185,7 +185,7 @@ if __name__ == '__main__':
 
     p = params.Params()
 
-    training_dir = './saved_model_training/model.h5'
+    training_dir = './saved_model_training/' + results.model_name + '_backup.h5'
     train_dir = './saved_model/model_'
     if results.fly_data:
         train_ds, test_ds, count_train, count_test = read_fly_db()

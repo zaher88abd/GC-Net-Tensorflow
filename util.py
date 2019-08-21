@@ -83,10 +83,9 @@ def load_and_preprocess_image(path, depth=False):
     return preprocess_image(image, depth=depth)
 
 
-def read_fly_db():
+def read_fly_db(monkaa_dataset=False):
+    main_path = './dataset/'
     param = params.Params()
-    dirs = ['./dataset/' + 'flyingthings3d_frames_cleanpass/',
-            './dataset/' + 'flyingthings3d__disparity/disparity/']
 
     l_img_path_train = []
     r_img_path_train = []
@@ -98,11 +97,13 @@ def read_fly_db():
 
     count_train = 0
     count_test = 0
-    if not os.path.exists(dirs[0] + "train_dataset.csv") and not os.path.exists(dirs[0] + "test_dataset.csv"):
+    if not os.path.exists(main_path + "train_dataset.csv") and not os.path.exists(main_path + "test_dataset.csv"):
+        dirs_fly = ['./dataset/' + 'flyingthings3d_frames_cleanpass/',
+                    './dataset/' + 'flyingthings3d__disparity/disparity/']
         for phase in tqdm(['TRAIN', 'TEST']):
-            for group in tqdm(['A', 'B', 'C']):
-                dir_group = dirs[0] + phase + '/' + group
-                dir_group2 = dirs[1] + phase + '/' + group
+            for group in tqdm(['A', 'B', 'C', 'D']):
+                dir_group = dirs_fly[0] + phase + '/' + group
+                dir_group2 = dirs_fly[1] + phase + '/' + group
                 for img_group in tqdm(os.listdir(dir_group)):
                     dir_img_group = dir_group + '/' + img_group
                     dir_dis_group = dir_group2 + '/' + img_group
@@ -124,18 +125,36 @@ def read_fly_db():
                             r_img_path_test.append(img_path_r)
                             d_img_path_test.append(disparity_path)
                             count_test += 1
+        if monkaa_dataset == True:
+            dirs_monkaa = [main_path + 'monkaa_frames_cleanpass',
+                           main_path + 'monkaa_disparity']
+            for folder in tqdm(os.listdir(dirs_monkaa[0])):
+                for img in tqdm(os.listdir(os.path.join(dirs_monkaa[0], folder, 'left'))):
+                    img_path_l = os.path.join(dirs_monkaa[0], folder, 'left', img)
+                    img_path_r = os.path.join(dirs_monkaa[0], folder, 'right', img)
+                    if not os.path.exists(os.path.join(dirs_monkaa[1], folder, 'left', img)):
+                        disparity_path = os.path.join(dirs_monkaa[1], folder, 'left', img.split('.')[0] + '.pfm')
+                        data, scale = readPFM(disparity_path)
+                        cv2.imwrite(os.path.join(dirs_monkaa[1], folder, 'left', img), data)
+                    disparity_path = os.path.join(dirs_monkaa[1], folder, 'left', img)
+
+                    l_img_path_train.append(img_path_l)
+                    r_img_path_train.append(img_path_r)
+                    d_img_path_train.append(disparity_path)
+                    count_train += 1
+
         dist = {'img_l': l_img_path_train, 'img_r': r_img_path_train, "img_d": d_img_path_train}
-        pd.DataFrame(dist).to_csv(dirs[0] + "train_dataset.csv")
+        pd.DataFrame(dist).to_csv(main_path + "train_dataset.csv")
         dist = {'img_l': l_img_path_test, 'img_r': r_img_path_test, "img_d": d_img_path_test}
-        pd.DataFrame(dist).to_csv(dirs[0] + "test_dataset.csv")
+        pd.DataFrame(dist).to_csv(main_path + "test_dataset.csv")
     else:
-        train_dp = pd.read_csv(dirs[0] + "train_dataset.csv")
+        train_dp = pd.read_csv(main_path + "train_dataset.csv")
         l_img_path_train = train_dp['img_l'].to_list()
         r_img_path_train = train_dp['img_r'].to_list()
         d_img_path_train = train_dp['img_d'].to_list()
         count_train = len(l_img_path_train)
 
-        test_dp = pd.read_csv(dirs[0] + "test_dataset.csv")
+        test_dp = pd.read_csv(main_path + "test_dataset.csv")
         l_img_path_test = test_dp['img_l'].to_list()
         r_img_path_test = test_dp['img_r'].to_list()
         d_img_path_test = test_dp['img_d'].to_list()
