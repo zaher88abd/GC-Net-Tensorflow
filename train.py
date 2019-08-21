@@ -50,9 +50,9 @@ init = tf.group(tf.global_variables_initializer(),
                 tf.local_variables_initializer())
 
 loss_summary = tf.summary.scalar("loss", loss)
-gs_summary = tf.summary.image('pred', pred / 191.0 * 255, max_outputs=5)
-gt_summary = tf.summary.image('GT_disp', disp, max_outputs=5)
-c_summary = tf.summary.image('img_L', (img_L + 0.5) * 255, max_outputs=5)
+gs_summary = tf.summary.image('pred', pred / 191.0 * 255, max_outputs=1)
+gt_summary = tf.summary.image('GT_disp', disp, max_outputs=1)
+c_summary = tf.summary.image('img_L', (img_L + 0.5) * 255, max_outputs=1)
 
 train_loss_ = []
 test_loss_ = []
@@ -83,7 +83,8 @@ with tf.Session() as sess:
     duration_avg = 0
     threads = tf.train.start_queue_runners(sess=sess, coord=coord)
     traning_loss = []
-    for step in range(60000):
+    start = 0
+    for step in range(start, 60000):
         start = time.time()
         batch = sess.run(batch_train)
         feed_dict = {img_L: batch[0], img_R: batch[1], disp: batch[2], phase: True}
@@ -94,7 +95,7 @@ with tf.Session() as sess:
         duration += (end - start)
         duration_avg += (end - start)
         traning_loss.append(loss_value)
-        summary_writer_train.add_summary(loss_s, glb_step)
+        summary_writer_train.add_summary(loss_s, step)
         if glb_step % 2 == 0 and step > 0:
             #            print('Step %d: training loss = %.2f | sample disparity: %.2f |
             #            ground truth: %.2f' % (step, loss_value, sample_dis, sample_gt))
@@ -102,32 +103,28 @@ with tf.Session() as sess:
             duration = 0
             # train_loss_.append([loss_value, glb_step])
 
-        if glb_step % 50 == 0 and step > 0:
-            test_total_loss = 0
-            for j in range(10):
-                batch = sess.run(batch_test)
-                feed_dict = {img_L: batch[0], img_R: batch[1], disp: batch[2], phase: False}
-                test_loss, loss_s, gs_s, c_s, gt_s = sess.run([loss, loss_summary, gs_summary, c_summary, gt_summary],
-                                                              feed_dict=feed_dict)
-                test_total_loss += test_loss
-                summary_writer_test.add_summary(loss_s, glb_step + j)
-                summary_writer_test.add_summary(c_s, glb_step + j)
-                summary_writer_test.add_summary(gs_s, glb_step + j)
-                summary_writer_test.add_summary(gt_s, glb_step + j)
-            test_total_loss = test_total_loss / 10
-            print(np.array(traning_loss).shape)
+        if glb_step % 10 == 0 and step > 0:
+            batch = sess.run(batch_test)
+            feed_dict = {img_L: batch[0], img_R: batch[1], disp: batch[2], phase: False}
+            test_loss, loss_s, gs_s, c_s, gt_s = sess.run([loss, loss_summary, gs_summary, c_summary, gt_summary],
+                                                          feed_dict=feed_dict)
+
+            summary_writer_test.add_summary(loss_s, step)
+            summary_writer_test.add_summary(c_s, step)
+            summary_writer_test.add_summary(gs_s, step)
+            summary_writer_test.add_summary(gt_s, step)
             print('------------------  Step %d: test loss = %.2f time = %0.3f avg_t=%0.3f------------------' % (
-                glb_step, test_total_loss, duration_avg / 50, np.array(traning_loss).astype(np.float).mean()))
+                glb_step, test_loss, duration_avg / 50, np.array(traning_loss).astype(np.float).mean()))
             duration_avg = 0
             saver.save(sess, train_backup_dir, global_step=global_step)
 
-            if glb_step % (500 * 5) == 0 and step > 0:
-                key = input("Do you want to save model?[y/n] ").capitalize()
-                if key == "Y":
-                    saver.save(sess, train_zed_dir, global_step=global_step)
-                key = input("Do you want to continue training?[y/n] ").capitalize()
-                if key == "N":
-                    break
+            # if glb_step % (500 * 5) == 0 and step > 0:
+            #     key = input("Do you want to save model?[y/n] ").capitalize()
+            #     if key == "Y":
+            #         saver.save(sess, train_zed_dir, global_step=global_step)
+            #     key = input("Do you want to continue training?[y/n] ").capitalize()
+            #     if key == "N":
+            #         break
 
     coord.request_stop()
     coord.join(threads)
