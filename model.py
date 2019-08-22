@@ -1,5 +1,8 @@
 import os
 import time
+
+from tensorflow._api.v1 import io
+
 import params
 from util import read_fly_db, read_db
 import argparse
@@ -27,43 +30,54 @@ class OutLayer(Layer):
                                 data_format='channels_last', padding='valid')
 
 
-def conv2d_blk(img_L, img_R, name, kernel, filters, stride, phase, norm_activ=True):
-    conv2_scope = k.layers.Conv2D(name=name, kernel_size=kernel, filters=filters, strides=[stride, stride],
-                                  padding="same", trainable=phase)
-    if norm_activ:
-        btn = k.layers.BatchNormalization(axis=-1, trainable=phase)
-        act = k.layers.Activation("relu", trainable=phase)
-        h_1_L = act(btn(conv2_scope(img_L)))
-        h_1_R = act(btn(conv2_scope(img_R)))
-        return h_1_L, h_1_R
-    h_1_L = conv2_scope(img_L)
-    h_1_R = conv2_scope(img_R)
+def conv2d_blk(img_L, img_R, name, kernel, filters, stride, phase, activation=True):
+    if activation:
+        acv = k.layers.Activation('relu')
+        conv2_scope = k.layers.Conv2D(name=name, kernel_size=kernel, filters=filters, strides=[stride, stride],
+                                      padding="same", trainable=phase)
+        h_1_L = conv2_scope(acv(img_L))
+        h_1_R = conv2_scope(acv(img_R))
+    else:
+        conv2_scope = k.layers.Conv2D(name=name, kernel_size=kernel, filters=filters, strides=[stride, stride],
+                                      padding="same", trainable=phase)
+        h_1_L = conv2_scope(img_L)
+        h_1_R = conv2_scope(img_R)
     return h_1_L, h_1_R
 
 
 def conv3d_blk(x, name, kernel, filters, strid, phase):
-    conv3d = k.layers.Conv3D(name=name, kernel_size=kernel, filters=filters, strides=strid, padding="same",
-                             trainable=phase)(x)
-    x = k.layers.BatchNormalization()(conv3d)
-    x = k.layers.Activation('relu')(x)
+    x = k.layers.BatchNormalization()(x)
+    x = k.layers.Activation("relu")(x)
+    x = k.layers.Conv3D(name=name, kernel_size=kernel, filters=filters, strides=strid, padding="same",
+                        trainable=phase, activation='relu')(x)
     return x
 
 
 def deconv3d_blk(x, name, kernal, filters, strid, pahse):
-    deconv3d_blk = k.layers.Conv3DTranspose(name=name, kernel_size=kernal, filters=filters, strides=strid,
-                                            padding="same", activation=k.activations.relu, trainable=pahse)(x)
-    deconv = BatchNormalization(axis=-1)(deconv3d_blk)
-    deconv = k.layers.Activation("relu")(deconv)
-    return deconv
+    x = k.layers.BatchNormalization()(x)
+    x = k.layers.Activation('relu')(x)
+    x = k.layers.Conv3DTranspose(name=name, kernel_size=kernal, filters=filters, strides=strid,
+                                 padding="same", activation=k.activations.relu, trainable=pahse)(x)
+    return x
 
 
 def res_blk(h_conv1_L, h_conv1_R, name, kernel, filters, stride, phase):
-    h_L_a, h_R_a = conv2d_blk(h_conv1_L, h_conv1_R, name=name + "a", kernel=kernel, filters=filters, stride=stride,
-                              phase=phase)
-    h_L_b, h_R_b = conv2d_blk(h_L_a, h_R_a, name=name + "b", kernel=kernel, filters=filters, stride=stride, phase=phase)
+    h_conv2_L_a = k.layers.BatchNormalization(trainable=phase)(h_conv1_L)
+    h_conv2_R_a = k.layers.BatchNormalization(trainable=phase)(h_conv1_R)
 
-    h_conv3_L_c = k.layers.Add()([h_L_b, h_conv1_L])
-    h_conv3_R_c = k.layers.Add()([h_R_b, h_conv1_R])
+    h_conv2_L_b, h_conv2_R_b = conv2d_blk(h_conv2_L_a, h_conv2_R_a, name=name + "a",
+                                          kernel=kernel, filters=filters, stride=stride,
+                                          phase=phase, activation=True)
+
+    h_conv3_L_a = k.layers.BatchNormalization(trainable=phase)(h_conv2_L_b)
+    h_conv3_R_a = k.layers.BatchNormalization(trainable=phase)(h_conv2_R_b)
+
+    h_conv3_L_b, h_conv3_R_b = conv2d_blk(h_conv3_L_a, h_conv3_R_a, name=name + "b",
+                                          kernel=kernel, filters=filters, stride=stride,
+                                          phase=phase, activation=True)
+
+    h_conv3_L_c = k.layers.Add()([h_conv3_L_b, h_conv1_L])
+    h_conv3_R_c = k.layers.Add()([h_conv3_R_b, h_conv1_R])
 
     return h_conv3_L_c, h_conv3_R_c
 
@@ -114,7 +128,8 @@ def build_model(phase=True):
 
     input_l = k.Input(batch_size=parameters.batch_size, shape=img_shape, name="img_l")
     input_r = k.Input(batch_size=parameters.batch_size, shape=img_shape, name="img_r")
-    h_1_L, h_1_R = conv2d_blk(input_l, input_r, name="conv1", kernel=(5, 5), filters=32, stride=2, phase=phase)
+    h_1_L, h_1_R = conv2d_blk(input_l, input_r, name="conv1", kernel=(5, 5), filters=32, stride=2,
+                              activation=False, phase=phase)
     h_3_L, h_3_R = res_blk(h_1_L, h_1_R, name="res2-3", kernel=(3, 3), filters=32, stride=1, phase=phase)
     h_5_L, h_5_R = res_blk(h_3_L, h_3_R, name="res4-5", kernel=(3, 3), filters=32, stride=1, phase=phase)
     h_7_L, h_7_R = res_blk(h_5_L, h_5_R, name="res6-7", kernel=(3, 3), filters=32, stride=1, phase=phase)
@@ -123,12 +138,11 @@ def build_model(phase=True):
     h_13_L, h_13_R = res_blk(h_11_L, h_11_R, name="res11-13", kernel=(3, 3), filters=32, stride=1, phase=phase)
     h_15_L, h_15_R = res_blk(h_13_L, h_13_R, name="res14-15", kernel=(3, 3), filters=32, stride=1, phase=phase)
     h_17_L, h_17_R = res_blk(h_15_L, h_15_R, name="res16-17", kernel=(3, 3), filters=32, stride=1, phase=phase)
-    h_18_L, h_18_R = conv2d_blk(h_17_L, h_17_R, name="conv18", kernel=(3, 3), filters=32, stride=1, phase=phase,
-                                norm_activ=False)
+    h_18_L, h_18_R = conv2d_blk(h_17_L, h_17_R, name="conv18", kernel=(3, 3), filters=32, stride=1,
+                                activation=True, phase=phase)
 
     # corr = cost_volume(h_18_L, h_18_R, parameters.max_disparity)
-    corr = k.layers.Lambda(cost_volume, arguments={'max_d': parameters.max_disparity },
-                           output_shape=(parameters.max_disparity / 2, None, None, 32 * 2))([h_18_L, h_18_R])
+    corr = k.layers.Lambda(cost_volume, arguments={'max_d': parameters.max_disparity})([h_18_L, h_18_R])
 
     h_19 = conv3d_blk(x=corr, name="conv19", kernel=(3, 3, 3), filters=32, strid=1, phase=phase)
     h_20 = conv3d_blk(x=h_19, name="conv20", kernel=(3, 3, 3), filters=32, strid=1, phase=phase)
@@ -203,12 +217,12 @@ if __name__ == '__main__':
         print("Build model")
         model = build_model()
 
-        STEPS_PER_EPOCH_TRAIN = 100
-        STEPS_PER_EPOCH_TEST = 10
+        STEPS_PER_EPOCH_TRAIN = 10
+        STEPS_PER_EPOCH_TEST = 5
 
         l_train, r_train, d_train = next(iter(train_ds))
         l_test, r_test, d_test = next(iter(test_ds))
-        epochs = 600
+        epochs = 650
         learning_rate = 0.001
         opt = k.optimizers.RMSprop(lr=learning_rate, decay=0)
         model_check_point = k.callbacks.ModelCheckpoint(training_dir, monitor='val_loss',
@@ -216,9 +230,43 @@ if __name__ == '__main__':
                                                         save_weights_only=False, mode='auto',
                                                         period=1)
 
+        file_writer_cm = tf.contrib.summary.create_file_writer("./log_k/img_" + results.model_name + "/")
+
+
+        def feed_inputs_4_display():
+            p = params.Params()
+            img_l = np.asarray(Image.open(
+                "/mnt/ExtStorge/Git/projects/GC-Net-Tensorflow/dataset/flyingthings3d_frames_cleanpass/TEST/A/0000/left/0006.png").resize(
+                (p.target_w, p.target_h)))
+            img_r = np.asarray(Image.open(
+                "/mnt/ExtStorge/Git/projects/GC-Net-Tensorflow/dataset/flyingthings3d_frames_cleanpass/TEST/A/0000/right/0006.png").resize(
+                (p.target_w, p.target_h)))
+            img_d = np.asarray(Image.open(
+                "/mnt/ExtStorge/Git/projects/GC-Net-Tensorflow/dataset/flyingthings3d__disparity/disparity/TEST/A/0000/left/0006.png").resize(
+                (p.target_w, p.target_h)))
+            return img_l, img_r, img_d
+
+
+        def log_confusion_matrix(epoch, logs):
+            # logs = logs or {}
+            if epochs % 1 == 0:  # every 200 iterations or batches, plot the costumed images using TensorBorad;
+                summary_str = []
+                l_test, r_test, d_test = feed_inputs_4_display()
+
+                disp_pred = model.predict(
+                    x=[np.expand_dims(l_test / 255 - 0.5, axis=0), np.expand_dims(r_test / 255 - 0.5, axis=0)],
+                    batch_size=1)[0]
+                # print("khkjhkjhkjhkjhkjhk", type(disp_pred))
+                f_out = tf.image.decode_jpeg(disp_pred / 191.0 * 255.0, channels=1)
+                with file_writer_cm.as_default():
+                    tf.summary.image('pred', tf.expand_dims(f_out, 0), max_outputs=1)
+                    tf.summary.image('GT_disp', tf.expand_dims(d_test, 0), max_outputs=1)
+                    tf.summary.image('img_L', tf.expand_dims(l_test, 0), max_outputs=1)
+
 
         callbacks = [k.callbacks.TensorBoard("./log_k/" + results.model_name + "/",
-                                             update_freq='batch'), model_check_point]
+                                             update_freq='batch', profile_batch=0), model_check_point]
+        # k.callbacks.LambdaCallback(on_epoch_end=log_confusion_matrix)]
         model.summary()
         model.compile(optimizer=opt, loss=keras_asl)
         model.fit(x=[l_train, r_train], y=[d_train], epochs=epochs, verbose=1, steps_per_epoch=STEPS_PER_EPOCH_TRAIN,
