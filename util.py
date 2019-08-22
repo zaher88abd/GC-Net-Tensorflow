@@ -15,7 +15,7 @@ import cv2
 import params
 import pandas as pd
 
-tf.enable_eager_execution()
+# tf.enable_eager_execution()
 
 
 def readPFM(file):
